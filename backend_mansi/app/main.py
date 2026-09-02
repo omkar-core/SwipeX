@@ -19,7 +19,18 @@ from app.models import User, RefreshToken, Role, AuthProvider
 from app.deps import get_current_user, require_role
 from app.gateway import router as gateway_router
 
-app = FastAPI(title="SwipeX Auth & Identity Service", version="0.3.0")
+app = FastAPI(
+    title="SwipeX Auth & Identity Service",
+    version="0.4.0",
+    description=(
+        "Handles registration, login (email/password + Google OAuth2), "
+        "JWT issuing/refresh, and role-based access control (RBAC) for "
+        "SwipeX. Also acts as the API Gateway, forwarding authenticated "
+        "requests to the Job/Swipe and Resume/ATS services.\n\n"
+        "**Day 6 note:** see `docs/testing.md` for the test suite and "
+        "known limitations."
+    ),
+)
 
 # Needed by Authlib to store OAuth state between redirect and callback.
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET_KEY", "dev-only-session-secret"))
@@ -50,7 +61,14 @@ def health_check():
 # ---------------------------------------------------------------------------
 # Register
 # ---------------------------------------------------------------------------
-@app.post("/api/v1/auth/register", response_model=schemas.RegisterResponse, status_code=201)
+@app.post(
+    "/api/v1/auth/register",
+    response_model=schemas.RegisterResponse,
+    status_code=201,
+    summary="Register a new user",
+    description="Creates a new account with a hashed password. Returns 409 if the email is already registered.",
+    tags=["Auth"],
+)
 def register(payload: schemas.RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
@@ -72,7 +90,13 @@ def register(payload: schemas.RegisterRequest, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Login (email + password)
 # ---------------------------------------------------------------------------
-@app.post("/api/v1/auth/login", response_model=schemas.TokenResponse)
+@app.post(
+    "/api/v1/auth/login",
+    response_model=schemas.TokenResponse,
+    summary="Log in with email + password",
+    description="Verifies credentials and issues an access token (15 min) and refresh token (30 days).",
+    tags=["Auth"],
+)
 def login(payload: schemas.LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not user.password_hash or not security.verify_password(payload.password, user.password_hash):
@@ -149,7 +173,13 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
 # ---------------------------------------------------------------------------
 # Refresh
 # ---------------------------------------------------------------------------
-@app.post("/api/v1/auth/refresh", response_model=schemas.RefreshResponse)
+@app.post(
+    "/api/v1/auth/refresh",
+    response_model=schemas.RefreshResponse,
+    summary="Exchange a refresh token for a new access token",
+    description="Used when an access token expires, so the user doesn't have to log in again for 30 days.",
+    tags=["Auth"],
+)
 def refresh(payload: schemas.RefreshRequest, db: Session = Depends(get_db)):
     token_row = db.query(RefreshToken).filter(RefreshToken.token == payload.refresh_token).first()
 
@@ -167,7 +197,13 @@ def refresh(payload: schemas.RefreshRequest, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Me
 # ---------------------------------------------------------------------------
-@app.get("/api/v1/auth/me", response_model=schemas.MeResponse)
+@app.get(
+    "/api/v1/auth/me",
+    response_model=schemas.MeResponse,
+    summary="Get the current logged-in user",
+    description="Requires a valid Bearer access token. Returns the user's id, name, and role.",
+    tags=["Auth"],
+)
 def me(current_user: User = Depends(get_current_user)):
     return schemas.MeResponse(
         user_id=current_user.id,

@@ -18,8 +18,15 @@ from app.models import User
 
 router = APIRouter()
 
-JOB_SERVICE_URL = os.getenv("JOB_SERVICE_URL", "http://localhost:8002")
-RESUME_SERVICE_URL = os.getenv("RESUME_SERVICE_URL", "http://localhost:8003")
+
+def _job_service_url() -> str:
+    """Read fresh on every call (not once at import) so tests can point
+    this at a fake URL — see tests/test_gateway_proxy.py."""
+    return os.getenv("JOB_SERVICE_URL", "http://localhost:8002")
+
+
+def _resume_service_url() -> str:
+    return os.getenv("RESUME_SERVICE_URL", "http://localhost:8003")
 
 
 async def _proxy(request: Request, base_url: str, path: str) -> Response:
@@ -53,12 +60,12 @@ async def _proxy(request: Request, base_url: str, path: str) -> Response:
 
 @router.get("/api/v1/jobs")
 async def gateway_list_jobs(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, JOB_SERVICE_URL, "/api/v1/jobs")
+    return await _proxy(request, _job_service_url(), "/api/v1/jobs")
 
 
 @router.get("/api/v1/jobs/{job_id}")
 async def gateway_job_detail(job_id: str, request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, JOB_SERVICE_URL, f"/api/v1/jobs/{job_id}")
+    return await _proxy(request, _job_service_url(), f"/api/v1/jobs/{job_id}")
 
 
 @router.post("/api/v1/swipes")
@@ -66,12 +73,12 @@ async def gateway_create_swipe(
     request: Request,
     current_user: User = Depends(require_role("job_seeker")),
 ):
-    return await _proxy(request, JOB_SERVICE_URL, "/api/v1/swipes")
+    return await _proxy(request, _job_service_url(), "/api/v1/swipes")
 
 
 @router.get("/api/v1/swipes/history")
 async def gateway_swipe_history(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, JOB_SERVICE_URL, "/api/v1/swipes/history")
+    return await _proxy(request, _job_service_url(), "/api/v1/swipes/history")
 
 
 # ---------------------------------------------------------------------------
@@ -83,14 +90,14 @@ async def gateway_swipe_history(request: Request, current_user: User = Depends(g
 
 @router.post("/api/v1/resume/upload")
 async def gateway_resume_upload(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, RESUME_SERVICE_URL, "/api/v1/resume/upload")
+    return await _proxy(request, _resume_service_url(), "/api/v1/resume/upload")
 
 
 @router.get("/api/v1/resume/{resume_id}/ats-score")
 async def gateway_ats_score(resume_id: str, request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, RESUME_SERVICE_URL, f"/api/v1/resume/{resume_id}/ats-score")
+    return await _proxy(request, _resume_service_url(), f"/api/v1/resume/{resume_id}/ats-score")
 
 
 @router.get("/api/v1/recommendations")
 async def gateway_recommendations(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, RESUME_SERVICE_URL, "/api/v1/recommendations")
+    return await _proxy(request, _resume_service_url(), "/api/v1/recommendations")

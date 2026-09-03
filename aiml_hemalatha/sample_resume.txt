@@ -1,0 +1,18 @@
+@"
+
+Skills:
+Python
+Java
+SQL
+HTML
+CSS
+Machine Learning
+FastAPI
+
+Projects:
+AI Chatbot
+Resume Parser
+"@ | Set-Content sample_resume.txt
+Jane Doe
+Frontend developer skilled in JavaScript, HTML, and CSS.
+Also familiar with React and basic SQL.

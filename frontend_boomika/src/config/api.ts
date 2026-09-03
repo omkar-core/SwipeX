@@ -51,8 +51,8 @@ export const API_ENDPOINTS = {
     RECOMMENDATIONS: '/recommendations',
   },
   PROFILE: {
-    ME: '/profile/me',
-    UPDATE: '/profile/me',
+    ME: '/auth/me',
+    UPDATE: '/auth/me',
     UPLOAD_PICTURE: '/profile/upload-picture',
   }
 };

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Job, FilterState, SavedJob, TimelineItem, RecommendedAction } from '../types';
 import { ApiService } from '../services/api';
+import { API_CONFIG } from '../config/api';
 import { MOCK_JOBS, MOCK_TIMELINE, MOCK_RECOMMENDED_ACTIONS, MOCK_SAVED_JOBS } from '../data/mockData';
 import { useToast } from './ToastContext';
 
@@ -29,8 +30,8 @@ const JobContext = createContext<JobContextType | undefined>(undefined);
 
 export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
-  const [allJobs, setAllJobs] = useState<Job[]>(MOCK_JOBS);
+  const [jobs, setJobs] = useState<Job[]>(() => API_CONFIG.USE_MOCK ? MOCK_JOBS : []);
+  const [allJobs, setAllJobs] = useState<Job[]>(() => API_CONFIG.USE_MOCK ? MOCK_JOBS : []);
   const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(false);
   const [filters, setFilters] = useState<FilterState>({
     industry: 'All',
@@ -72,6 +73,13 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
     if (!currentJob) return;
+
+    // Validate UUID in live backend mode before submitting swipe
+    const isValidUuid = (id: any) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+    if (!API_CONFIG.USE_MOCK && !isValidUuid(currentJob.job_id)) {
+      showToast('Please wait for live jobs to load before swiping.', 'error');
+      return;
+    }
 
     try {
       // POST swipe to service

@@ -19,6 +19,8 @@ from app.models import User, RefreshToken, Role, AuthProvider
 from app.deps import get_current_user, require_role
 from app.gateway import router as gateway_router
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(
     title="SwipeX Auth & Identity Service",
     version="0.4.0",
@@ -30,6 +32,15 @@ app = FastAPI(
         "**Day 6 note:** see `docs/testing.md` for the test suite and "
         "known limitations."
     ),
+)
+
+# Enable CORS middleware for frontend and cross-service calls
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Needed by Authlib to store OAuth state between redirect and callback.

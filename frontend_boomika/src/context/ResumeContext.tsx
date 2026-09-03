@@ -41,8 +41,10 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [resume.resume_id]);
 
   useEffect(() => {
-    fetchAtsScore();
-  }, [fetchAtsScore]);
+    if (resume.resume_id && !resume.resume_id.startsWith('res_2024_')) {
+      fetchAtsScore();
+    }
+  }, [fetchAtsScore, resume.resume_id]);
 
   const uploadResumeFile = useCallback(async (file: File) => {
     setIsUploading(true);

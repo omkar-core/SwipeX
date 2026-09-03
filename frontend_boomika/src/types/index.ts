@@ -1,5 +1,58 @@
 export type UserRole = 'candidate' | 'recruiter' | 'admin';
 
+export interface AdminDashboardData {
+  total_users: number;
+  total_recruiters: number;
+  total_job_seekers: number;
+  total_jobs: number;
+  active_jobs: number;
+  total_applications: number;
+  pending_items: number;
+}
+
+export interface AdminUserRecord {
+  user_id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: string;
+  created_at?: string;
+  company_name?: string;
+}
+
+export interface AdminRecruiterRecord extends AdminUserRecord {
+  designation?: string;
+  job_count: number;
+}
+
+export interface AdminJobRecord {
+  job_id: string;
+  title: string;
+  company: string;
+  location: string;
+  status: JobStatus;
+  recruiter_id?: string;
+  posted_at?: string;
+  application_count: number;
+}
+
+export interface AdminApplicationRecord {
+  application_id: string;
+  candidate_name: string;
+  candidate_email: string;
+  job_title: string;
+  company: string;
+  recruiter_id?: string;
+  stage: string;
+  applied_at?: string;
+}
+
+export interface AdminAnalyticsData {
+  user_types: Record<string, number>;
+  job_status: Record<string, number>;
+  application_stages: Record<string, number>;
+}
+
 export interface User {
   user_id: string;
   name: string;
@@ -172,3 +225,118 @@ export interface JobRecommendation {
   match_percentage: number;
   generated_by: string;
 }
+
+export type JobStatus = 'active' | 'closed' | 'draft';
+
+export type PipelineStage = 'New' | 'Shortlisted' | 'Interviewing' | 'Offered' | 'Rejected';
+
+export interface RecruiterJob extends Job {
+  status?: JobStatus;
+  recruiter_id?: string;
+  applicant_count?: number;
+  job_type?: string;
+}
+
+export interface ApplicantCandidateProfile {
+  user_id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  location?: string;
+  bio?: string;
+  profile_picture_url?: string;
+  skills: string[];
+  resume_url?: string;
+  current_title?: string;
+  experience_years?: number;
+  expected_salary?: number;
+}
+
+export interface Applicant {
+  application_id: string;
+  job_id: string | number;
+  candidate_id: string;
+  candidate: ApplicantCandidateProfile;
+  stage: PipelineStage;
+  match_score: number;
+  applied_at: string;
+  updated_at?: string;
+  notes?: string;
+}
+
+export interface CreateJobInput {
+  title: string;
+  company: string;
+  location: string;
+  salary_min?: number;
+  salary_max?: number;
+  salary_range?: string;
+  work_environment?: 'Remote' | 'Hybrid' | 'On-site';
+  industry?: string;
+  job_type?: string;
+  description?: string;
+  skills?: string[];
+  status?: JobStatus;
+}
+
+export interface RecruiterAnalyticsData {
+  total_jobs: number;
+  active_jobs: number;
+  closed_jobs: number;
+  draft_jobs: number;
+  total_applicants: number;
+  stage_counts: Record<PipelineStage, number>;
+  avg_time_to_hire_days: number;
+}
+
+export interface CandidateFunnelCounts {
+  applied: number;
+  shortlisted: number;
+  interviewing: number;
+  offered: number;
+  rejected: number;
+}
+
+export interface CandidateSkillGapItem {
+  skill: string;
+  count: number;
+  percentage: number;
+  learn_url?: string;
+}
+
+export interface CandidateScoreTrendItem {
+  date: string;
+  score: number;
+  job_title?: string;
+  company?: string;
+}
+
+export interface CandidateIndustryEngagementItem {
+  industry: string;
+  count: number;
+  percentage: number;
+}
+
+export interface CandidateActivityDayItem {
+  date: string;
+  day: string;
+  count: number;
+  level: number;
+}
+
+export interface CandidateAnalyticsData {
+  total_swipes: number;
+  applications_sent: number;
+  profile_view_rate: number;
+  profile_view_trend: string;
+  avg_match_score: number;
+  funnel_counts: CandidateFunnelCounts;
+  top_skills_gap: CandidateSkillGapItem[];
+  top_skills_matched?: string[];
+  score_trend: CandidateScoreTrendItem[];
+  top_industries: CandidateIndustryEngagementItem[];
+  activity_heatmap: CandidateActivityDayItem[];
+  generated_at?: string;
+}
+
+

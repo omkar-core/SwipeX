@@ -146,7 +146,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
             {/* Description */}
             <div className="mb-6">
               <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">About the Role</h3>
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">{job.description || (job as any).job_description}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{job.description}</p>
             </div>
 
             {/* Company Overview */}

@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Compass, 
   Briefcase, 
@@ -8,7 +7,11 @@ import {
   HelpCircle,
   LogOut,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  LayoutDashboard,
+  PlusCircle,
+  Columns3,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TabType } from './TopNav';
@@ -24,7 +27,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
   const { user, currentRole, logout, switchRole } = useAuth();
   const { showToast } = useToast();
 
-  const navItems = [
+  const candidateNavItems = [
     { id: 'discover' as TabType, label: 'Discover', icon: Compass },
     { id: 'applications' as TabType, label: 'Applications', icon: Briefcase },
     { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
@@ -32,10 +35,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
     { id: 'analytics' as TabType, label: 'Analytics', icon: BarChart2 },
   ];
 
+  const recruiterNavItems = [
+    { id: 'recruiter-dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'recruiter-post-job' as TabType, label: 'Post a Job', icon: PlusCircle },
+    { id: 'recruiter-pipeline' as TabType, label: 'Candidates (Pipeline)', icon: Columns3 },
+    { id: 'recruiter-jobs' as TabType, label: 'My Job Listings', icon: Briefcase },
+    { id: 'analytics' as TabType, label: 'Analytics', icon: BarChart2 },
+    { id: 'messages' as TabType, label: 'Messages', icon: MessageSquare },
+    { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
+  ];
+
+  const adminNavItems = [
+    { id: 'recruiter-dashboard' as TabType, label: 'Platform Dashboard', icon: LayoutDashboard },
+    { id: 'recruiter-jobs' as TabType, label: 'Job Listings', icon: Briefcase },
+    { id: 'analytics' as TabType, label: 'System Analytics', icon: BarChart2 },
+    { id: 'profile' as TabType, label: 'Admin Profile', icon: ShieldCheck },
+  ];
+
+  const navItems = currentRole === 'admin'
+    ? adminNavItems
+    : currentRole === 'recruiter'
+      ? recruiterNavItems
+      : candidateNavItems;
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as UserRole;
     switchRole(newRole);
+    if (newRole === 'recruiter') {
+      onTabChange('recruiter-dashboard');
+    } else if (newRole === 'admin') {
+      onTabChange('recruiter-dashboard');
+    } else if (newRole === 'candidate') {
+      onTabChange('discover');
+    }
     showToast(`Switched active workspace view to ${newRole.toUpperCase()}`, 'info');
   };
 

@@ -10,11 +10,11 @@
 
 export const API_CONFIG = {
   // Base URL for real backend REST endpoints
-  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8001/api/v1',
+  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8000/api/v1',
   
   // Flag to toggle between real fetch calls and isolated mock fallback
-  // Default is false unless VITE_USE_MOCK is explicitly set to 'true'
-  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true',
+  // Default is true when VITE_USE_MOCK is 'true' or not specified in dev
+  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'false' ? false : true,
 
   // Request timeout in milliseconds
   TIMEOUT_MS: 10000,
@@ -27,6 +27,8 @@ export const API_CONFIG = {
     SWIPES: 'swipex_swipes',
     RESUME: 'swipex_resume',
     SAVED_JOBS: 'swipex_saved_jobs',
+    RECRUITER_JOBS: 'swipex_recruiter_jobs',
+    RECRUITER_APPLICANTS: 'swipex_recruiter_applicants',
   }
 };
 
@@ -51,9 +53,27 @@ export const API_ENDPOINTS = {
     RECOMMENDATIONS: '/recommendations',
   },
   PROFILE: {
-    ME: '/auth/me',
-    UPDATE: '/auth/me',
+    ME: '/profile/me',
+    UPDATE: '/profile/me',
     UPLOAD_PICTURE: '/profile/upload-picture',
+  },
+  RECRUITER: {
+    JOBS: '/recruiter/jobs',
+    JOB_STATUS: (jobId: string | number) => `/recruiter/jobs/${jobId}`,
+    APPLICANTS: (jobId: string | number) => `/recruiter/jobs/${jobId}/applicants`,
+    APPLICANT_STAGE: (applicationId: string) => `/recruiter/applicants/${applicationId}/stage`,
+    ANALYTICS: '/recruiter/analytics',
+  },
+  ANALYTICS: {
+    CANDIDATE_SUMMARY: '/analytics/candidate-summary',
+  },
+  ADMIN: {
+    DASHBOARD: '/admin/dashboard',
+    USERS: '/admin/users',
+    RECRUITERS: '/admin/recruiters',
+    JOBS: '/admin/jobs',
+    APPLICATIONS: '/admin/applications',
+    ANALYTICS: '/admin/analytics',
   }
 };
 

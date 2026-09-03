@@ -19,38 +19,21 @@ import {
   ATSScoreResult, 
   JobRecommendation,
   UserProfile,
-  UserProfileUpdate
+  UserProfileUpdate,
+  RecruiterJob,
+  Applicant,
+  CreateJobInput,
+  JobStatus,
+  PipelineStage,
+  RecruiterAnalyticsData,
+  CandidateAnalyticsData
+  , AdminDashboardData, AdminUserRecord, AdminRecruiterRecord, AdminJobRecord, AdminApplicationRecord, AdminAnalyticsData
 } from '../types';
 import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME } from '../data/mockData';
 
 
 // Realistic network latency simulation helper for mock mode
 const mockDelay = (ms = 250) => new Promise(resolve => setTimeout(resolve, ms));
-
-function cleanDescription(rawDesc?: string): string {
-  if (!rawDesc) return '';
-  return rawDesc
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\n\s*\n/g, '\n\n')
-    .trim();
-}
-
-function adaptJobResponse(rawJob: any): Job {
-  if (!rawJob) return rawJob;
-  const descriptionRaw = rawJob.description || rawJob.job_description || '';
-  const cleanedDesc = cleanDescription(descriptionRaw);
-  return {
-    ...rawJob,
-    description: cleanedDesc,
-    job_description: descriptionRaw,
-    company: typeof rawJob.company === 'object' ? (rawJob.company?.name || '') : (rawJob.company || ''),
-    company_info: rawJob.company_info || (typeof rawJob.company === 'object' ? rawJob.company?.company_type : undefined),
-    skills_required: rawJob.skills_required || rawJob.skills || [],
-    salary_min: rawJob.salary_min ?? rawJob.min_salary,
-    salary_max: rawJob.salary_max ?? rawJob.max_salary,
-  };
-}
 
 // Helper for real HTTP requests
 async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -125,13 +108,9 @@ export class ApiService {
     role?: UserRole 
   }): Promise<{ user_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
-      const formattedPayload = {
-        ...payload,
-        role: payload.role === 'candidate' ? 'job_seeker' : (payload.role || 'job_seeker')
-      };
       return httpRequest<{ user_id: string }>(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
-        body: JSON.stringify(formattedPayload),
+        body: JSON.stringify(payload),
       });
     }
 
@@ -251,6 +230,58 @@ export class ApiService {
     };
   }
 
+  static async getAdminDashboard(): Promise<AdminDashboardData> {
+    if (API_CONFIG.USE_MOCK) {
+      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
+      return { total_users: 1, total_recruiters: user.role === 'recruiter' ? 1 : 0, total_job_seekers: user.role === 'candidate' ? 1 : 0, total_jobs: MOCK_JOBS.length, active_jobs: MOCK_JOBS.length, total_applications: 0, pending_items: 0 };
+    }
+    return httpRequest<AdminDashboardData>(API_ENDPOINTS.ADMIN.DASHBOARD);
+  }
+
+  static async getAdminUsers(params: { search?: string; role?: string } = {}): Promise<AdminUserRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
+      return [{ user_id: user.user_id, name: user.name, email: user.email, role: user.role, status: 'active' }].filter((item) => (!params.role || item.role === params.role) && (!params.search || `${item.name} ${item.email}`.toLowerCase().includes(params.search.toLowerCase())));
+    }
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.role) query.set('role', params.role);
+    return httpRequest<AdminUserRecord[]>(`${API_ENDPOINTS.ADMIN.USERS}?${query}`);
+  }
+
+  static async getAdminRecruiters(search?: string): Promise<AdminRecruiterRecord[]> {
+    if (API_CONFIG.USE_MOCK) return [];
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return httpRequest<AdminRecruiterRecord[]>(`${API_ENDPOINTS.ADMIN.RECRUITERS}${query}`);
+  }
+
+  static async getAdminJobs(params: { search?: string; status?: string } = {}): Promise<AdminJobRecord[]> {
+    if (API_CONFIG.USE_MOCK) return MOCK_JOBS.map((job) => ({ job_id: String(job.job_id), title: job.title, company: job.company, location: job.location, status: 'active' as JobStatus, posted_at: job.posted_at, application_count: 0 })).filter((item) => (!params.status || item.status === params.status) && (!params.search || `${item.title} ${item.company}`.toLowerCase().includes(params.search.toLowerCase())));
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.status) query.set('status', params.status);
+    return httpRequest<AdminJobRecord[]>(`${API_ENDPOINTS.ADMIN.JOBS}?${query}`);
+  }
+
+  static async getAdminApplications(params: { search?: string; stage?: string } = {}): Promise<AdminApplicationRecord[]> {
+    if (API_CONFIG.USE_MOCK) return [];
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.stage) query.set('stage', params.stage);
+    return httpRequest<AdminApplicationRecord[]>(`${API_ENDPOINTS.ADMIN.APPLICATIONS}?${query}`);
+  }
+
+  static async getAdminAnalytics(): Promise<AdminAnalyticsData> {
+    if (API_CONFIG.USE_MOCK) {
+      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
+      return { user_types: { candidates: user.role === 'candidate' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
+    }
+    return httpRequest<AdminAnalyticsData>(API_ENDPOINTS.ADMIN.ANALYTICS);
+  }
+
   /* ==========================================================================
      2. JOB & SWIPE CONTRACTS
      ========================================================================== */
@@ -273,28 +304,15 @@ export class ApiService {
       if (params) {
         if (params.type) query.append('type', params.type);
         if (params.location) query.append('location', params.location);
-        if (params.remote) {
-          if (typeof params.remote === 'boolean') {
-            query.append('remote', params.remote ? 'true' : 'false');
-          } else if (params.remote === 'true' || params.remote === 'false') {
-            query.append('remote', params.remote);
-          } else if (typeof params.remote === 'string') {
-            const envs = params.remote.split(',');
-            if (envs.includes('Remote') && !envs.includes('Hybrid') && !envs.includes('On-site')) {
-              query.append('remote', 'true');
-            }
-          }
-        }
+        if (params.remote) query.append('remote', params.remote);
         if (params.salary_min) query.append('salary_min', params.salary_min.toString());
         if (params.salary_max) query.append('salary_max', params.salary_max.toString());
         if (params.skills) query.append('skills', params.skills);
         if (params.industry) query.append('industry', params.industry);
       }
-
       const queryString = query.toString();
       const endpoint = `${API_ENDPOINTS.JOBS.LIST}${queryString ? `?${queryString}` : ''}`;
-      const rawJobs = await httpRequest<any[]>(endpoint, { method: 'GET' });
-      return rawJobs.map(adaptJobResponse);
+      return httpRequest<Job[]>(endpoint, { method: 'GET' });
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub with dynamic filtering) ---
@@ -335,8 +353,7 @@ export class ApiService {
    */
   static async getJobById(jobId: string): Promise<Job> {
     if (!API_CONFIG.USE_MOCK) {
-      const rawJob = await httpRequest<any>(API_ENDPOINTS.JOBS.DETAIL(jobId), { method: 'GET' });
-      return adaptJobResponse(rawJob);
+      return httpRequest<Job>(API_ENDPOINTS.JOBS.DETAIL(jobId), { method: 'GET' });
     }
 
     // --- MOCK SERVICE LAYER ---
@@ -357,13 +374,9 @@ export class ApiService {
     direction: 'left' | 'right' | 'up' 
   }): Promise<{ swipe_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
-      const formattedPayload = {
-        job_id: String(payload.job_id),
-        direction: payload.direction.toUpperCase()
-      };
       return httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
         method: 'POST',
-        body: JSON.stringify(formattedPayload),
+        body: JSON.stringify(payload),
       });
     }
 
@@ -459,20 +472,8 @@ export class ApiService {
    */
   static async getAtsScore(resumeId: string, jobId?: string): Promise<ATSScoreResult> {
     if (!API_CONFIG.USE_MOCK) {
-      if (!jobId || !resumeId || resumeId.startsWith('res_2024_')) {
-        return {
-          match_score: 85,
-          missing_keywords: ['System Architecture', 'Cloud Deployment'],
-          generated_by: 'SwipeX-Pre-upload-Fallback'
-        };
-      }
-      const endpoint = `${API_ENDPOINTS.RESUME.ATS_SCORE(resumeId)}?job_id=${encodeURIComponent(jobId)}`;
-      const data = await httpRequest<any>(endpoint, { method: 'GET' });
-      return {
-        match_score: data.match_score ?? data.ats_score ?? 0,
-        missing_keywords: data.missing_keywords ?? data.missing_skills ?? [],
-        generated_by: data.generated_by ?? 'heuristic-v0'
-      };
+      const endpoint = `${API_ENDPOINTS.RESUME.ATS_SCORE(resumeId)}${jobId ? `?job_id=${jobId}` : ''}`;
+      return httpRequest<ATSScoreResult>(endpoint, { method: 'GET' });
     }
 
     // --- DYNAMIC CLIENT-SIDE KEYWORD OVERLAP ALGORITHM (Milestone 1 Heuristic) ---
@@ -562,6 +563,124 @@ export class ApiService {
       return MOCK_INITIAL_RESUME;
     }
   }
+
+  /* ==========================================================================
+     5. CANDIDATE ANALYTICS CONTRACTS
+     ========================================================================== */
+
+  /**
+   * Generates candidate analytics derived from local state (saved jobs, timeline, resume)
+   * with realistic fallbacks for historical trends and mock metrics.
+   */
+  static generateMockCandidateAnalytics(
+    savedJobsCount = 5,
+    timelineItemsCount = 4,
+    userParsedSkills: string[] = ['Figma', 'Design Systems', 'Prototyping', 'User Research', 'React Basics']
+  ): CandidateAnalyticsData {
+    const totalSwipes = Math.max(savedJobsCount * 2 + 6, 16);
+    const applicationsSent = Math.max(savedJobsCount, 5);
+
+    const learnUrls: Record<string, string> = {
+      'GraphQL': 'https://graphql.org/learn/',
+      'Design Tokens': 'https://spectrum.adobe.com/page/design-tokens/',
+      'Storybook': 'https://storybook.js.org/',
+      'TypeScript': 'https://www.typescriptlang.org/docs/',
+      'Linear': 'https://linear.app/docs',
+      'Next.js': 'https://nextjs.org/learn',
+      'Docker': 'https://docs.docker.com/get-started/',
+    };
+
+    const topSkillsGap = [
+      { skill: 'GraphQL', count: 6, percentage: 75, learn_url: learnUrls['GraphQL'] },
+      { skill: 'Design Tokens', count: 5, percentage: 62, learn_url: learnUrls['Design Tokens'] },
+      { skill: 'Storybook', count: 4, percentage: 50, learn_url: learnUrls['Storybook'] },
+      { skill: 'TypeScript', count: 3, percentage: 38, learn_url: learnUrls['TypeScript'] },
+      { skill: 'Linear API', count: 2, percentage: 25, learn_url: learnUrls['Linear'] },
+    ];
+
+    const scoreTrend = [
+      { date: 'May 04', score: 82, job_title: 'UX Specialist', company: 'Linear' },
+      { date: 'May 08', score: 85, job_title: 'Product Designer', company: 'Figma' },
+      { date: 'May 12', score: 84, job_title: 'Lead UI Designer', company: 'Airbnb' },
+      { date: 'May 17', score: 91, job_title: 'Senior Product Designer', company: 'Stripe' },
+      { date: 'May 22', score: 88, job_title: 'Design Systems Lead', company: 'Vercel' },
+      { date: 'May 27', score: 95, job_title: 'Staff Designer', company: 'Nexus Technologies' },
+      { date: 'Jun 01', score: 92, job_title: 'Principal Designer', company: 'Datadog' },
+    ];
+
+    const topIndustries = [
+      { industry: 'Fintech / Payments', count: 6, percentage: 40 },
+      { industry: 'Artificial Intelligence', count: 4, percentage: 27 },
+      { industry: 'Developer Tools', count: 3, percentage: 20 },
+      { industry: 'Cloud Infrastructure', count: 2, percentage: 13 },
+    ];
+
+    // Generate 28-day activity heatmap
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const activityHeatmap = Array.from({ length: 28 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (27 - i));
+      const dayName = daysOfWeek[d.getDay()];
+      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const intensity = ((i * 3 + 2) % 7) % 5;
+      return {
+        date: dateStr,
+        day: dayName,
+        count: intensity * 3,
+        level: intensity,
+      };
+    });
+
+    return {
+      total_swipes: totalSwipes,
+      applications_sent: applicationsSent,
+      profile_view_rate: 34,
+      profile_view_trend: '+34% this week',
+      avg_match_score: 89,
+      funnel_counts: {
+        applied: applicationsSent,
+        shortlisted: Math.max(Math.floor(applicationsSent * 0.6), 2),
+        interviewing: Math.max(Math.floor(applicationsSent * 0.4), 1),
+        offered: Math.max(Math.floor(applicationsSent * 0.2), 1),
+        rejected: 1,
+      },
+      top_skills_gap: topSkillsGap,
+      top_skills_matched: userParsedSkills.slice(0, 5),
+      score_trend: scoreTrend,
+      top_industries: topIndustries,
+      activity_heatmap: activityHeatmap,
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Fetches Candidate Analytics Summary with real backend API support
+   * and fallback to client-side derived analytics.
+   */
+  static async getCandidateAnalytics(fallbackContext?: {
+    savedJobsCount?: number;
+    timelineCount?: number;
+    userSkills?: string[];
+  }): Promise<CandidateAnalyticsData> {
+    if (!API_CONFIG.USE_MOCK) {
+      try {
+        return await httpRequest<CandidateAnalyticsData>(API_ENDPOINTS.ANALYTICS.CANDIDATE_SUMMARY, {
+          method: 'GET',
+        });
+      } catch (err) {
+        console.warn('Backend analytics endpoint call failed, falling back to dynamic generator:', err);
+      }
+    }
+
+    // Mock mode / fallback with client-side delay for realistic UX
+    await mockDelay(280);
+    return this.generateMockCandidateAnalytics(
+      fallbackContext?.savedJobsCount,
+      fallbackContext?.timelineCount,
+      fallbackContext?.userSkills
+    );
+  }
 }
 
 /**
@@ -571,35 +690,7 @@ export class ProfileApiService {
 
   static async getProfile(): Promise<UserProfile> {
     if (!API_CONFIG.USE_MOCK) {
-      try {
-        const me = await httpRequest<{ user_id: string; name: string; role: UserRole }>(API_ENDPOINTS.AUTH.ME, { method: 'GET' });
-        const storedUserRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-        let user: Partial<User> = {};
-        if (storedUserRaw) {
-          try { user = JSON.parse(storedUserRaw); } catch { /* ignore */ }
-        }
-        return {
-          user_id: me.user_id,
-          name: user.name || me.name,
-          email: user.email || 'user@example.com',
-          role: me.role,
-          phone: user.phone || '+1 (555) 014-3829',
-          location: user.location || 'Bangalore, India (Hybrid)',
-          bio: user.bio || 'Product Developer specializing in design systems, AI tools, and full-stack applications.',
-          profile_picture_url: user.avatar || user.profile_picture_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-          skills: user.skills || ['Python', 'FastAPI', 'React', 'TypeScript', 'SQL'],
-          experience_years: user.experience_years ?? 3,
-          resume_url: user.resume_url,
-          current_title: user.current_title || user.title || 'Full Stack Engineer',
-          expected_salary: user.expected_salary ?? 120000,
-          job_type_preference: user.job_type_preference || 'Hybrid',
-          company_name: user.company_name,
-          company_website: user.company_website,
-          designation: user.designation,
-        };
-      } catch {
-        // Fallback to local session user data if request fails
-      }
+      return httpRequest<UserProfile>(API_ENDPOINTS.PROFILE.ME);
     }
 
     // Mock Mode
@@ -636,9 +727,15 @@ export class ProfileApiService {
   }
 
   static async updateProfile(data: UserProfileUpdate): Promise<UserProfile> {
-    // Both live and mock mode persist profile updates locally in client session
-    // (since backend M1 auth endpoint intentionally supports GET /api/v1/auth/me only)
-    await mockDelay(!API_CONFIG.USE_MOCK ? 100 : 350);
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<UserProfile>(API_ENDPOINTS.PROFILE.UPDATE, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    }
+
+    // Mock Mode
+    await mockDelay(350);
     const current = await this.getProfile();
     const updated: UserProfile = {
       ...current,
@@ -669,6 +766,7 @@ export class ProfileApiService {
       designation: updated.designation,
     };
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(userToSave));
+
     return updated;
   }
 
@@ -705,4 +803,373 @@ export class ProfileApiService {
     });
   }
 }
+
+/**
+ * RecruiterApiService — Handles job posting CRUD, candidate pipeline fetching, and stage updates.
+ */
+export class RecruiterApiService {
+
+  private static getInitialMockApplicants(jobId: string | number): Applicant[] {
+    return [
+      {
+        application_id: `app_${jobId}_01`,
+        job_id: jobId,
+        candidate_id: 'usr_c101',
+        candidate: {
+          user_id: 'usr_c101',
+          name: 'Sophia Chen',
+          email: 'sophia.chen@craftui.io',
+          phone: '+1 (555) 234-8901',
+          location: 'San Francisco, CA (Hybrid)',
+          bio: 'Design Systems Architect with 7+ years creating multi-brand UI component libraries, token systems, and rapid prototyping workflows.',
+          profile_picture_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+          skills: ['Figma', 'Design Systems', 'React', 'TypeScript', 'Tokens Studio', 'Enterprise UX'],
+          resume_url: '/resumes/sophia-chen-resume.pdf',
+          current_title: 'Lead Product Designer',
+          experience_years: 7,
+          expected_salary: 175000,
+        },
+        stage: 'Shortlisted',
+        match_score: 95,
+        applied_at: '2 hours ago',
+        notes: 'Exceptional portfolio presentation. Strong experience in Figma design tokens and design systems.',
+      },
+      {
+        application_id: `app_${jobId}_02`,
+        job_id: jobId,
+        candidate_id: 'usr_c102',
+        candidate: {
+          user_id: 'usr_c102',
+          name: 'Marcus Vance',
+          email: 'marcus.v@devcraft.com',
+          phone: '+1 (555) 345-9012',
+          location: 'New York, NY (On-site)',
+          bio: 'Frontend engineer turned interface craftsman. Focused on web performance, accessible interaction models, and Next.js micro-frontends.',
+          profile_picture_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
+          skills: ['React', 'Next.js', 'Tailwind CSS', 'TypeScript', 'Web Audio API', 'WCAG AAA'],
+          resume_url: '/resumes/marcus-vance-resume.pdf',
+          current_title: 'Senior Frontend Engineer',
+          experience_years: 5,
+          expected_salary: 165000,
+        },
+        stage: 'Interviewing',
+        match_score: 91,
+        applied_at: '1 day ago',
+        notes: 'Technical round scheduled for Thursday 2:00 PM EST.',
+      },
+      {
+        application_id: `app_${jobId}_03`,
+        job_id: jobId,
+        candidate_id: 'usr_c103',
+        candidate: {
+          user_id: 'usr_c103',
+          name: 'Elena Rostova',
+          email: 'elena.rostova@techfront.org',
+          phone: '+1 (555) 456-0123',
+          location: 'Austin, TX (Remote)',
+          bio: 'Passionate UI engineer specialized in data-heavy enterprise dashboards and interactive vector charts.',
+          profile_picture_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
+          skills: ['Figma', 'Prototyping', 'User Research', 'React', 'D3.js', 'Enterprise UX'],
+          resume_url: '/resumes/elena-rostova-resume.pdf',
+          current_title: 'Senior UX Designer',
+          experience_years: 6,
+          expected_salary: 160000,
+        },
+        stage: 'New',
+        match_score: 88,
+        applied_at: '3 hours ago',
+        notes: 'Swiped right from discovery deck. High skill alignment with design tools.',
+      },
+      {
+        application_id: `app_${jobId}_04`,
+        job_id: jobId,
+        candidate_id: 'usr_c104',
+        candidate: {
+          user_id: 'usr_c104',
+          name: 'Liam Gallagher',
+          email: 'liam.g@cloudpulse.io',
+          phone: '+1 (555) 567-1234',
+          location: 'Seattle, WA (Remote)',
+          bio: 'Staff Product Designer with a track record of scaling consumer fintech apps to 10M+ MAU with high NPS.',
+          profile_picture_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
+          skills: ['Fintech UX', 'Design Systems', 'Figma', 'User Research', 'Rapid Prototyping'],
+          resume_url: '/resumes/liam-gallagher-resume.pdf',
+          current_title: 'Staff Product Designer',
+          experience_years: 9,
+          expected_salary: 195000,
+        },
+        stage: 'Offered',
+        match_score: 96,
+        applied_at: '4 days ago',
+        notes: 'Offer package sent: $190,000 base + 0.15% equity. Awaiting sign-off.',
+      },
+      {
+        application_id: `app_${jobId}_05`,
+        job_id: jobId,
+        candidate_id: 'usr_c105',
+        candidate: {
+          user_id: 'usr_c105',
+          name: 'Maya Patel',
+          email: 'maya.patel@horizondev.com',
+          phone: '+1 (555) 678-2345',
+          location: 'Chicago, IL (Hybrid)',
+          bio: 'Junior to Mid frontend developer exploring modern component libraries and web styling patterns.',
+          profile_picture_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
+          skills: ['HTML', 'CSS', 'JavaScript', 'Bootstrap', 'React Basics'],
+          resume_url: '/resumes/maya-patel-resume.pdf',
+          current_title: 'Frontend Developer',
+          experience_years: 2,
+          expected_salary: 105000,
+        },
+        stage: 'Rejected',
+        match_score: 68,
+        applied_at: '5 days ago',
+        notes: 'Insufficient senior-level architecture experience for current lead opening.',
+      },
+      {
+        application_id: `app_${jobId}_06`,
+        job_id: jobId,
+        candidate_id: 'usr_c106',
+        candidate: {
+          user_id: 'usr_c106',
+          name: 'David Kim',
+          email: 'david.kim@apexsystems.dev',
+          phone: '+1 (555) 789-3456',
+          location: 'San Jose, CA (Hybrid)',
+          bio: 'Principal UI/UX Specialist with deep experience in mobile native interfaces, micro-interactions, and accessibility.',
+          profile_picture_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&auto=format&fit=crop&q=80',
+          skills: ['Figma', 'Mobile UX', 'Micro-interactions', 'Design Tokens', 'Storybook'],
+          resume_url: '/resumes/david-kim-resume.pdf',
+          current_title: 'Principal UI Designer',
+          experience_years: 8,
+          expected_salary: 185000,
+        },
+        stage: 'New',
+        match_score: 93,
+        applied_at: 'Just now',
+        notes: 'New swipe-in! High affinity for enterprise design system roles.',
+      }
+    ];
+  }
+
+  static async getPostedJobs(): Promise<RecruiterJob[]> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<RecruiterJob[]>(API_ENDPOINTS.RECRUITER.JOBS, { method: 'GET' });
+    }
+
+    // Mock Mode
+    await mockDelay(200);
+    const stored = localStorage.getItem(API_CONFIG.STORAGE_KEYS.RECRUITER_JOBS);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {}
+    }
+
+    // Seed initial recruiter jobs from MOCK_JOBS
+    const seeded: RecruiterJob[] = MOCK_JOBS.slice(0, 5).map((job, idx) => ({
+      ...job,
+      status: idx === 3 ? 'draft' : idx === 4 ? 'closed' : 'active',
+      applicant_count: idx === 0 ? 6 : idx === 1 ? 8 : idx === 2 ? 4 : 2,
+    }));
+
+    localStorage.setItem(API_CONFIG.STORAGE_KEYS.RECRUITER_JOBS, JSON.stringify(seeded));
+    return seeded;
+  }
+
+  static async createJob(payload: CreateJobInput): Promise<RecruiterJob> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<RecruiterJob>(API_ENDPOINTS.RECRUITER.JOBS, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    }
+
+    // Mock Mode
+    await mockDelay(350);
+    const existing = await this.getPostedJobs();
+    const newId = `job_${Date.now().toString(36)}`;
+    const salaryRange = payload.salary_range || 
+      (payload.salary_min && payload.salary_max 
+        ? `$${Math.round(payload.salary_min / 1000)}k-$${Math.round(payload.salary_max / 1000)}k`
+        : '$140k-$180k');
+
+    const newJob: RecruiterJob = {
+      job_id: newId,
+      title: payload.title,
+      company: payload.company,
+      location: payload.location,
+      salary_range: salaryRange,
+      salary_min: payload.salary_min,
+      salary_max: payload.salary_max,
+      work_environment: payload.work_environment || 'Hybrid',
+      industry: payload.industry || 'Technology',
+      job_type: payload.job_type || 'Full-time',
+      description: payload.description || '',
+      skills: payload.skills || [],
+      skills_required: payload.skills || [],
+      status: payload.status || 'active',
+      primary_tools: (payload.skills || []).slice(0, 3),
+      posted_at: new Date().toISOString(),
+      applicant_count: 0,
+      match_score: 90,
+    };
+
+    const updated = [newJob, ...existing];
+    localStorage.setItem(API_CONFIG.STORAGE_KEYS.RECRUITER_JOBS, JSON.stringify(updated));
+    return newJob;
+  }
+
+  static async updateJobStatus(jobId: string | number, status: JobStatus): Promise<RecruiterJob> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<RecruiterJob>(API_ENDPOINTS.RECRUITER.JOB_STATUS(jobId), {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+    }
+
+    // Mock Mode
+    await mockDelay(200);
+    const jobs = await this.getPostedJobs();
+    const index = jobs.findIndex(j => String(j.job_id) === String(jobId));
+    if (index === -1) {
+      throw new ApiError(`Job ${jobId} not found`, 404);
+    }
+
+    jobs[index].status = status;
+    localStorage.setItem(API_CONFIG.STORAGE_KEYS.RECRUITER_JOBS, JSON.stringify(jobs));
+    return jobs[index];
+  }
+
+  static async getApplicants(jobId: string | number): Promise<Applicant[]> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<Applicant[]>(API_ENDPOINTS.RECRUITER.APPLICANTS(jobId), {
+        method: 'GET',
+      });
+    }
+
+    // Mock Mode
+    await mockDelay(250);
+    const storedRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.RECRUITER_APPLICANTS);
+    let allApplicants: Record<string, Applicant[]> = {};
+    if (storedRaw) {
+      try {
+        allApplicants = JSON.parse(storedRaw);
+      } catch {}
+    }
+
+    const key = String(jobId);
+    if (!allApplicants[key] || allApplicants[key].length === 0) {
+      allApplicants[key] = this.getInitialMockApplicants(jobId);
+      localStorage.setItem(API_CONFIG.STORAGE_KEYS.RECRUITER_APPLICANTS, JSON.stringify(allApplicants));
+    }
+
+    return allApplicants[key];
+  }
+
+  static async updateApplicantStage(
+    applicationId: string,
+    stage: PipelineStage,
+    notes?: string
+  ): Promise<Applicant> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<Applicant>(API_ENDPOINTS.RECRUITER.APPLICANT_STAGE(applicationId), {
+        method: 'PATCH',
+        body: JSON.stringify({ stage, notes }),
+      });
+    }
+
+    // Mock Mode
+    await mockDelay(200);
+    const storedRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.RECRUITER_APPLICANTS);
+    let allApplicants: Record<string, Applicant[]> = {};
+    if (storedRaw) {
+      try {
+        allApplicants = JSON.parse(storedRaw);
+      } catch {}
+    }
+
+    let foundApplicant: Applicant | null = null;
+    for (const jId of Object.keys(allApplicants)) {
+      const list = allApplicants[jId];
+      const idx = list.findIndex(a => a.application_id === applicationId);
+      if (idx !== -1) {
+        list[idx].stage = stage;
+        if (notes !== undefined) {
+          list[idx].notes = notes;
+        }
+        list[idx].updated_at = new Date().toISOString();
+        foundApplicant = list[idx];
+        break;
+      }
+    }
+
+    if (!foundApplicant) {
+      throw new ApiError(`Applicant ${applicationId} not found`, 404);
+    }
+
+    localStorage.setItem(API_CONFIG.STORAGE_KEYS.RECRUITER_APPLICANTS, JSON.stringify(allApplicants));
+    return foundApplicant;
+  }
+
+  static async getAnalytics(): Promise<RecruiterAnalyticsData> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<RecruiterAnalyticsData>(API_ENDPOINTS.RECRUITER.ANALYTICS, {
+        method: 'GET',
+      });
+    }
+
+    // Mock Mode
+    await mockDelay(150);
+    const jobs = await this.getPostedJobs();
+    const storedRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.RECRUITER_APPLICANTS);
+    let allApplicants: Record<string, Applicant[]> = {};
+    if (storedRaw) {
+      try {
+        allApplicants = JSON.parse(storedRaw);
+      } catch {}
+    }
+
+    const stageCounts: Record<PipelineStage, number> = {
+      New: 0,
+      Shortlisted: 0,
+      Interviewing: 0,
+      Offered: 0,
+      Rejected: 0,
+    };
+
+    let totalApplicants = 0;
+    Object.values(allApplicants).forEach(list => {
+      list.forEach(app => {
+        totalApplicants++;
+        if (stageCounts[app.stage] !== undefined) {
+          stageCounts[app.stage]++;
+        }
+      });
+    });
+
+    // If no applicants stored yet, provide baseline counts
+    if (totalApplicants === 0) {
+      stageCounts.New = 6;
+      stageCounts.Shortlisted = 5;
+      stageCounts.Interviewing = 3;
+      stageCounts.Offered = 2;
+      stageCounts.Rejected = 2;
+      totalApplicants = 18;
+    }
+
+    return {
+      total_jobs: jobs.length,
+      active_jobs: jobs.filter(j => j.status === 'active').length,
+      closed_jobs: jobs.filter(j => j.status === 'closed').length,
+      draft_jobs: jobs.filter(j => j.status === 'draft').length,
+      total_applicants: totalApplicants,
+      stage_counts: stageCounts,
+      avg_time_to_hire_days: 18,
+    };
+  }
+}
+
+
+
 

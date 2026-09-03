@@ -1,205 +1,78 @@
-# Frontend_Boomika — SwipeX
+# SwipeX — Frontend & ATS Job Matching Platform
 
-## Project
-SwipeX — AI-Powered Swipe-Based Job Discovery and Personalized Career Intelligence Platform
-
-## Role
-Frontend & User Experience
-
-## Team
-Team 4
-
-## Frontend Technology Stack
-
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS
-- Framer Motion
-- REST API integration ready
-- Responsive UI/UX
+> **Milestone 1 (Frontend & UX) to Milestone 2 (Backend Integration Ready)**  
+> Next-generation swipe-based career & job discovery platform built with React 19, TypeScript, Vite, Tailwind CSS, and Framer Motion.
 
 ---
 
-# Day-by-Day Frontend Progress
+## 📸 Reference Screens Implemented
 
-## Day 1 — Project Setup & UI Planning
-
-### Completed
-- Analyzed the SwipeX project requirements.
-- Reviewed the frontend requirements and reference screens.
-- Planned the overall frontend architecture.
-- Set up the React + TypeScript + Vite frontend environment.
-- Configured Tailwind CSS and supporting frontend dependencies.
-- Planned reusable components and page structure.
-
-### Deliverable
-Initial frontend project structure and development environment.
+1. **Access Workspace / Login (`Screen 1`)**: Split-screen with dark navy brand hero (`#080E2A`), *"Accelerate Your Trajectory"* typography, Corporate Email, Secure Password + Recover link, Session maintenance, Authenticate action button, and Google OAuth SSO.
+2. **Discover / Swipe Screen (`Screen 2`)**: Top navigation with tab indicators, user profile card (*Alex Mercer*), Discovery Filters (Industry dropdown, Salary Target `$120k-$160k`, Work Environment checkboxes), interactive draggable job card (*Nexus Technologies*), Pass/Save action buttons, and Quick Peek panel.
+3. **Applications Dashboard (`Screen 3`)**: Left sidebar navigation (*Professional Hub - Tier 1 Talent*), circular 85 ATS Match gauge card (*Senior Product Designer @ Stripe*), vertical Application Timeline (*Interview Scheduled, Application Submitted, Resume Viewed*), Recommended Actions, and Recently Saved cards.
+4. **Upload Resume Screen (`Screen 4`)**: Drag & drop dashed upload dropzone, animated document analyzing progress bar, parsed result card (*84/100 Overall Fit Score*, *High Compatibility*), extracted ATS keywords, and ATS Optimization Tips sidebar.
 
 ---
 
-## Day 2 — Authentication & Login Interface
+## 🔌 API Architecture & Backend Contracts
 
-### Completed
-- Developed the Access Workspace / Login screen.
-- Added corporate email input.
-- Added secure password input.
-- Added password recovery option.
-- Added session maintenance option.
-- Added authentication action button.
-- Added Google OAuth login interface.
-- Implemented responsive split-screen layout.
-- Added SwipeX branding and visual styling.
+All REST calls are managed by the unified service in `src/services/api.ts` configured via `src/config/api.ts`.
 
-### Deliverable
-Functional and responsive authentication UI.
+### Switching from Mock to Real Backend (1-Step Toggle)
 
----
+In `.env` or your hosting environment:
+```env
+# 1. Provide your live backend base URL
+VITE_BASE_API_URL=http://localhost:8000/api/v1
 
-## Day 3 — Job Discovery & Swipe Interface
+# 2. Disable the mock layer
+VITE_USE_MOCK=false
+```
 
-### Completed
-- Developed the Discover / Swipe screen.
-- Added top navigation and tab indicators.
-- Created candidate profile card.
-- Added job discovery filters.
-- Added industry filtering.
-- Added salary target filtering.
-- Added work-environment selection.
-- Implemented interactive job cards.
-- Added swipe interactions.
-- Added Pass and Save actions.
-- Added Quick Peek job information panel.
-- Added swipe animation and gesture interaction.
+### Complete API Contract Specification
 
-### Deliverable
-Interactive swipe-based job discovery interface.
+| Domain | Endpoint | Method | Request Payload / Params | Response Status & Shape |
+|---|---|---|---|---|
+| **Auth** | `/api/v1/auth/register` | `POST` | `{ name, email, password, role }` | `201 { user_id }` |
+| **Auth** | `/api/v1/auth/login` | `POST` | `{ email, password }` | `200 { access_token, refresh_token, role }` |
+| **Auth** | `/api/v1/auth/oauth/google` | `GET` | *None* | `200 { access_token, role }` |
+| **Auth** | `/api/v1/auth/me` | `GET` | Header: `Bearer <token>` | `200 { user_id, name, role, user }` |
+| **Jobs** | `/api/v1/jobs` | `GET` | `?type=&location=&remote=&salary_min=&salary_max=&skills=&industry=` | `200 Array<Job>` |
+| **Jobs** | `/api/v1/jobs/{job_id}` | `GET` | *Path param* | `200 Job` |
+| **Swipes**| `/api/v1/swipes` | `POST` | `{ job_id, direction }` (`direction`: `'left'` \| `'right'` \| `'up'`) | `201 { swipe_id }` |
+| **Swipes**| `/api/v1/swipes/history` | `GET` | Header: `Bearer <token>` | `200 Array<{ job_id, direction, swiped_at }>` |
+| **Resume**| `/api/v1/resume/upload` | `POST` | `multipart/form-data` with `file` | `201 { resume_id, parsed_skills[] }` |
+| **ATS** | `/api/v1/resume/{id}/ats-score` | `GET` | `?job_id={id}` | `200 { match_score, missing_keywords[], generated_by }` |
+| **Recs** | `/api/v1/recommendations` | `GET` | `?user_id={id}` | `200 Array<{ job_id, match_percentage, generated_by }>` |
 
 ---
 
-## Day 4 — Applications Dashboard & Resume Upload
+## 🧩 Milestone 1 vs Milestone 2 Demarcation
 
-### Completed
-- Developed the Applications Dashboard.
-- Added ATS Match Score visualization.
-- Added application timeline.
-- Added interview/application status information.
-- Added recommended actions.
-- Added recently saved jobs section.
-- Developed Resume Upload screen.
-- Added drag-and-drop resume upload interface.
-- Added resume analysis progress UI.
-- Added parsed resume result card.
-- Added ATS keywords section.
-- Added ATS optimization tips.
+### Milestone 1 (Current State)
+- **Authentication**: Form submission required on load. Starts unauthenticated (`isAuthenticated: false`). Real token validation against `getMe()`.
+- **Role Gating**: Role support for `candidate` (Job Seeker), `recruiter` (Talent Partner), and `admin` (Platform Administrator) with role switcher and views.
+- **Dynamic Heuristic Engine**:
+  - `getAtsScore()`: Performs real client-side keyword and skill overlap mathematical calculation comparing resume skills to target job requirements rather than static numbers.
+  - `getRecommendations()`: Computes real affinity rankings dynamically against all available jobs based on skill intersection.
+- **UI & UX**: 100% pixel-perfect implementation matching all 4 reference screenshots with gesture swipe physics and keyboard arrow support.
 
-### Deliverable
-Applications management and resume analysis interfaces.
+### Milestone 2 (Backend Integration Scope)
+- Live database persistence (PostgreSQL / MongoDB / Supabase).
+- Live neural NLP/LLM resume parsing and server-side ATS vector embedding calculation.
+- Live WebSockets for direct recruiter conversations (`Messages` tab).
 
 ---
 
-## Day 5 — ATS Matching & Career Intelligence
+## 🚀 Running Locally
 
-### Completed
-- Implemented dynamic ATS score calculation on the frontend.
-- Added resume skill and job requirement comparison.
-- Implemented dynamic job recommendation logic.
-- Added skill-intersection based matching.
-- Added match percentage display.
-- Connected frontend service architecture for API communication.
-- Added support for candidate, recruiter, and admin role views.
-- Improved frontend navigation and UX consistency.
+```bash
+# 1. Install dependencies
+npm install
 
-### Deliverable
-Dynamic career intelligence and job matching functionality.
+# 2. Start Vite development server
+npm run dev
 
----
-
-## Day 6 — Frontend Integration Readiness & Finalization
-
-### Completed
-- Finalized Milestone 1 frontend implementation.
-- Verified all major frontend screens.
-- Improved responsive behavior.
-- Refined animations and swipe interactions.
-- Added keyboard-based swipe support.
-- Organized frontend components and services.
-- Prepared unified API service architecture.
-- Prepared frontend for backend integration.
-- Added environment-based API configuration.
-- Verified production build configuration.
-- Prepared frontend folder for team integration.
-
-### Deliverable
-Milestone 1 frontend completed and ready for backend integration.
-
----
-
-# Implemented Screens
-
-## Screen 1 — Access Workspace / Login
-
-Features:
-- Corporate Email
-- Secure Password
-- Recover Password
-- Session Maintenance
-- Authenticate
-- Google OAuth UI
-- Responsive layout
-
-## Screen 2 — Discover / Swipe
-
-Features:
-- Candidate profile
-- Job cards
-- Industry filters
-- Salary filters
-- Work environment filters
-- Swipe gestures
-- Pass
-- Save
-- Quick Peek
-
-## Screen 3 — Applications Dashboard
-
-Features:
-- ATS Match Score
-- Application Timeline
-- Recommended Actions
-- Recently Saved Jobs
-- Application status tracking
-
-## Screen 4 — Resume Upload
-
-Features:
-- Drag & Drop upload
-- Resume analysis progress
-- Parsed resume results
-- ATS Fit Score
-- Extracted keywords
-- ATS optimization tips
-
----
-
-# Frontend Architecture
-
-```text
-frontend_boomika/
-│
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── services/
-│   ├── config/
-│   └── ...
-│
-├── public/
-├── package.json
-├── package-lock.json
-├── vite.config.ts
-├── index.html
-├── tsconfig.json
-├── tailwind.config.js
-├── postcss.config.js
-└── README.md
+# 3. Build for production
+npm run build
+```

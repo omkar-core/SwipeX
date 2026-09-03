@@ -1,5 +1,5 @@
+from typing import List
 from fastapi import UploadFile, File
-from resume_parser import parse_resume
 import io
 import os
 
@@ -104,27 +104,3 @@ def parse_resume(file_bytes: bytes, filename: str):
         "parsed_skills": skills,
         "raw_text_preview": text[:500],
     }
-@app.post("/gateway/resume")
-async def upload_resume(file: UploadFile = File(...)):
-
-    try:
-        file_bytes = await file.read()
-
-        result = parse_resume(
-            file_bytes,
-            file.filename
-        )
-
-        return {
-            "status": "success",
-            "filename": file.filename,
-            "resume": result
-        }
-
-    except Exception as e:
-
-        return {
-            "status": "error",
-            "error": str(e),
-            "error_type": type(e).__name__
-        }

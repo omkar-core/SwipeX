@@ -32,12 +32,13 @@ def _resume_service_url() -> str:
 async def _proxy(request: Request, base_url: str, path: str) -> Response:
     """Forwards the incoming request to the target service and relays its response."""
     url = f"{base_url}{path}"
+    params = None if "?" in path else request.query_params
     async with httpx.AsyncClient() as client:
         try:
             upstream = await client.request(
                 method=request.method,
                 url=url,
-                params=request.query_params,
+                params=params,
                 headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
                 content=await request.body(),
                 timeout=10.0,
@@ -100,4 +101,4 @@ async def gateway_ats_score(resume_id: str, request: Request, current_user: User
 
 @router.get("/api/v1/recommendations")
 async def gateway_recommendations(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, _resume_service_url(), "/api/v1/recommendations")
+    return await _proxy(request, _resume_service_url(), f"/api/v1/recommendations?user_id={current_user.id}")

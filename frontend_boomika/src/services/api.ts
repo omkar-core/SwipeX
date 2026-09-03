@@ -100,9 +100,13 @@ export class ApiService {
     role?: UserRole 
   }): Promise<{ user_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
+      const formattedPayload = {
+        ...payload,
+        role: payload.role === 'candidate' ? 'job_seeker' : (payload.role || 'job_seeker')
+      };
       return httpRequest<{ user_id: string }>(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formattedPayload),
       });
     }
 
@@ -314,9 +318,13 @@ export class ApiService {
     direction: 'left' | 'right' | 'up' 
   }): Promise<{ swipe_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
+      const formattedPayload = {
+        job_id: String(payload.job_id),
+        direction: payload.direction.toUpperCase()
+      };
       return httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formattedPayload),
       });
     }
 
@@ -413,7 +421,12 @@ export class ApiService {
   static async getAtsScore(resumeId: string, jobId?: string): Promise<ATSScoreResult> {
     if (!API_CONFIG.USE_MOCK) {
       const endpoint = `${API_ENDPOINTS.RESUME.ATS_SCORE(resumeId)}${jobId ? `?job_id=${jobId}` : ''}`;
-      return httpRequest<ATSScoreResult>(endpoint, { method: 'GET' });
+      const data = await httpRequest<any>(endpoint, { method: 'GET' });
+      return {
+        match_score: data.match_score ?? data.ats_score ?? 0,
+        missing_keywords: data.missing_keywords ?? data.missing_skills ?? [],
+        generated_by: data.generated_by ?? 'heuristic-v0'
+      };
     }
 
     // --- DYNAMIC CLIENT-SIDE KEYWORD OVERLAP ALGORITHM (Milestone 1 Heuristic) ---

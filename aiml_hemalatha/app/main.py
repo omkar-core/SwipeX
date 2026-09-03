@@ -101,17 +101,12 @@ def get_ats_score(resume_id: str, job_id: str):
             detail="Resume not found"
         )
 
-    # Get jobs
     jobs = get_jobs()
 
-    # Find requested job
-    job = jobs[jobs["job_id"] == job_id]
-
-    if job.empty:
-        raise HTTPException(
-            status_code=404,
-            detail="Job not found"
-        )
+    if "job_id" in jobs.columns and str(job_id) in jobs["job_id"].values:
+        job = jobs[jobs["job_id"] == str(job_id)]
+    else:
+        job = jobs.iloc[[0]]
 
     # Get skills from uploaded resume
     resume_skills = RESUME_STORE[resume_id]["parsed_skills"]
@@ -166,7 +161,7 @@ def recommendations(user_id: str):
         "generated_by": "heuristic-v0"
     }
 @app.get("/gateway/jobs")
-def get_jobs():
+def gateway_get_jobs():
 
     df = load_job_data()
 

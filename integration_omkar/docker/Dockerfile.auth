@@ -1,0 +1,26 @@
+# Multi-stage/clean Python 3.11 image for Auth & Gateway Service (backend_mansi)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install system dependencies if required for psycopg2 or crypto
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend_mansi/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend_mansi/ /app/
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

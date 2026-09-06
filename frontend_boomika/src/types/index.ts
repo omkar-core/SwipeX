@@ -1,4 +1,4 @@
-export type UserRole = 'candidate' | 'recruiter' | 'admin';
+export type UserRole = 'job_seeker' | 'recruiter' | 'admin';
 
 export interface AdminDashboardData {
   total_users: number;

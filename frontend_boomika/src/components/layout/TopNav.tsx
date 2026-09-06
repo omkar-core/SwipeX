@@ -57,7 +57,7 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
 
       {/* Brand Logo */}
       <div 
-        onClick={() => onTabChange(currentRole === 'candidate' ? 'discover' : 'recruiter-dashboard')}
+        onClick={() => onTabChange(currentRole === 'job_seeker' ? 'discover' : 'recruiter-dashboard')}
         className="flex items-center gap-1.5 cursor-pointer select-none"
       >
         <span className="text-2xl font-black tracking-tight text-[#2563EB]">SwipeX</span>

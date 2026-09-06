@@ -23,7 +23,7 @@ export const AppLayout: React.FC = () => {
   const { isAuthenticated, isLoading, currentRole, logout } = useAuth();
   const { setSelectedJobId } = useRecruiter();
   const [activeTab, setActiveTab] = useState<TabType>(() => {
-    return currentRole === 'candidate' ? 'discover' : 'recruiter-dashboard';
+    return currentRole === 'job_seeker' ? 'discover' : 'recruiter-dashboard';
   });
   const [showAuthPreview, setShowAuthPreview] = useState(false);
   // Feature 8: Onboarding Skills Wizard state
@@ -39,7 +39,7 @@ export const AppLayout: React.FC = () => {
           ? 'recruiter-dashboard' 
           : prev
       );
-    } else if (currentRole === 'candidate') {
+    } else if (currentRole === 'job_seeker') {
       setActiveTab(prev => 
         prev === 'recruiter-dashboard' || prev === 'recruiter-post-job' || prev === 'recruiter-pipeline' || prev === 'recruiter-jobs'
           ? 'discover' 
@@ -101,7 +101,7 @@ export const AppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F4F7FB] dark:bg-[#0F1629] flex flex-col font-sans">
       {/* Role Notice Banner (if logged in as Recruiter or Admin) */}
-      {currentRole !== 'candidate' && (
+      {currentRole !== 'job_seeker' && (
         <div className="bg-slate-900 text-white px-4 py-1.5 text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="bg-blue-600 text-white text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded">

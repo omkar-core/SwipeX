@@ -65,7 +65,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
       onTabChange('recruiter-dashboard');
     } else if (newRole === 'admin') {
       onTabChange('recruiter-dashboard');
-    } else if (newRole === 'candidate') {
+    } else if (newRole === 'job_seeker') {
       onTabChange('discover');
     }
     showToast(`Switched active workspace view to ${newRole.toUpperCase()}`, 'info');
@@ -116,7 +116,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
                 onChange={handleRoleChange}
                 className="w-full bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-subtle"
               >
-                <option value="candidate">Candidate (Job Seeker)</option>
+                <option value="job_seeker">Candidate (Job Seeker)</option>
                 <option value="recruiter">Recruiter (Talent Partner)</option>
                 <option value="admin">Platform Admin</option>
               </select>

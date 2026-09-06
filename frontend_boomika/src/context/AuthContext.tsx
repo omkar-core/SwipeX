@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, password: string, role: UserRole = 'candidate') => {
+  const register = async (name: string, email: string, password: string, role: UserRole = 'job_seeker') => {
     setIsLoading(true);
     try {
       await ApiService.register({ name, email, password, role });
@@ -122,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
-  const currentRole: UserRole = user?.role || 'candidate';
+  const currentRole: UserRole = user?.role || 'job_seeker';
 
   return (
     <AuthContext.Provider

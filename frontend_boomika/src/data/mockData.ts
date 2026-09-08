@@ -4,7 +4,7 @@ export const INITIAL_USER: User = {
   user_id: 'usr_8829a1b',
   name: 'Alex Mercer',
   email: 'alex.mercer@design.co',
-  role: 'candidate',
+  role: 'job_seeker',
   title: 'Senior Product Designer',
   tier: 'Tier 1 Talent',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -814,13 +814,13 @@ export const MOCK_SAVED_JOBS: SavedJob[] = [
 ];
 
 export const MOCK_INITIAL_RESUME: ResumeData = {
-  resume_id: 'res_2024_johndoe',
-  filename: 'johndoe_resume_2024.pdf',
-  file_size: '1.8 MB',
-  uploaded_at: '2024-10-25T10:30:00Z',
-  parsed_skills: ['Figma', 'Design Systems', 'UI/UX Prototyping', 'Wireframing', 'User Research', 'React', 'Accessibility (WCAG)', 'TypeScript', 'Tailwind CSS', 'Micro-interactions'],
-  overall_fit_score: 88,
-  format_compatibility: 'High',
-  status: 'parsed',
-  progress: 100
+  resume_id: '',
+  filename: '',
+  file_size: '',
+  uploaded_at: '',
+  parsed_skills: [],
+  overall_fit_score: 0,
+  format_compatibility: 'Low',
+  status: 'error',
+  progress: 0
 };

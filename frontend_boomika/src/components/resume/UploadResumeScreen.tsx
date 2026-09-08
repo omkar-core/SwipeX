@@ -138,10 +138,10 @@ export const UploadResumeScreen: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900 leading-tight">
-                      {resume.filename || 'johndoe_resume_2024.pdf'}
+                      {resume.filename || 'No resume uploaded yet'}
                     </h3>
                     <p className="text-xs text-slate-500 font-medium mt-1">
-                      Parsed successfully. Ready for ATS matching.
+                      {resume.filename ? 'Parsed successfully. Ready for ATS matching.' : 'Upload a resume above to unlock ATS scoring and skill matching.'}
                     </p>
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export const UploadResumeScreen: React.FC = () => {
                   </span>
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-4xl font-extrabold text-[#2563EB] tracking-tight">
-                      {resume.overall_fit_score || 84}
+                      {resume.filename ? resume.overall_fit_score : 0}
                     </span>
                     <span className="text-xs font-bold text-slate-400">
                       /100
@@ -183,7 +183,7 @@ export const UploadResumeScreen: React.FC = () => {
                       <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </div>
                     <span className="text-sm font-bold text-slate-900">
-                      {resume.format_compatibility || 'High'}
+                      {resume.filename ? resume.format_compatibility : '—'}
                     </span>
                   </div>
                 </div>
@@ -196,14 +196,18 @@ export const UploadResumeScreen: React.FC = () => {
                   Extracted ATS Skill Keywords
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {resume.parsed_skills.map((skill, idx) => (
+                  {resume.parsed_skills.length > 0 ? resume.parsed_skills.map((skill, idx) => (
                     <span
                       key={idx}
                       className="text-xs font-medium bg-[#EBF3FF] text-[#2563EB] px-2.5 py-1 rounded-md border border-blue-100"
                     >
                       {skill}
                     </span>
-                  ))}
+                  )) : (
+                    <span className="text-xs font-medium text-slate-400">
+                      No skills extracted yet — upload a resume to see parsed keywords.
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

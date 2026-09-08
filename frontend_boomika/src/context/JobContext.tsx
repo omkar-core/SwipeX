@@ -3,6 +3,7 @@ import { Job, FilterState, SavedJob, TimelineItem, RecommendedAction } from '../
 import { ApiService } from '../services/api';
 import { MOCK_JOBS, MOCK_TIMELINE, MOCK_RECOMMENDED_ACTIONS, MOCK_SAVED_JOBS } from '../data/mockData';
 import { useToast } from './ToastContext';
+import { useAuth } from './AuthContext';
 
 interface JobContextType {
   jobs: Job[];
@@ -29,6 +30,7 @@ const JobContext = createContext<JobContextType | undefined>(undefined);
 
 export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [allJobs, setAllJobs] = useState<Job[]>(MOCK_JOBS);
   const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(false);
@@ -65,8 +67,9 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [filters, showToast]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchJobs();
-  }, [fetchJobs]);
+  }, [isAuthenticated, fetchJobs]);
 
   const currentJob = jobs[currentIndex] || null;
 

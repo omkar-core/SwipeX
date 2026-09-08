@@ -53,7 +53,7 @@ export const API_ENDPOINTS = {
     RECOMMENDATIONS: '/recommendations',
   },
   PROFILE: {
-    ME: '/profile/me',
+    ME: '/auth/me',
     UPDATE: '/profile/me',
     UPLOAD_PICTURE: '/profile/upload-picture',
   },

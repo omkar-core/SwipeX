@@ -49,7 +49,7 @@ class JobRepository:
         page_size: int = 20,
         type_param: Optional[str] = None,
         location_param: Optional[str] = None,
-        remote_param: Optional[bool] = None,
+        work_mode_param: Optional[List[str]] = None,
         salary_min: Optional[float] = None,
         salary_max: Optional[float] = None,
         skills_param: Optional[List[str]] = None,
@@ -74,10 +74,13 @@ class JobRepository:
                 where_clauses.append(f"LOWER(j.location) LIKE LOWER({param_placeholder})")
             params.append(f"%{location_param.strip()}%")
 
-        # 3. Remote Filter (work_mode = 'REMOTE')
-        if remote_param is True:
-            where_clauses.append(f"j.work_mode = {param_placeholder}")
-            params.append("REMOTE")
+        # 3. Work Mode Filter (supports multiple modes: REMOTE, HYBRID, ONSITE)
+        if work_mode_param:
+            clean_modes = [m.strip() for m in work_mode_param if m.strip()]
+            if clean_modes:
+                mode_placeholders = ", ".join([param_placeholder] * len(clean_modes))
+                where_clauses.append(f"j.work_mode IN ({mode_placeholders})")
+                params.extend(clean_modes)
 
         # 4. Salary Filter (Option B: Exclude undisclosed salary rows when salary filters supplied)
         if salary_min is not None and salary_max is not None:

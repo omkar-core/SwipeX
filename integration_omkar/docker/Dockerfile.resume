@@ -1,0 +1,30 @@
+# Python 3.11 image for Resume & Career Intelligence Service (aiml_hemalatha)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    fastapi==0.115.0 \
+    uvicorn[standard]==0.30.6 \
+    pandas==2.2.3 \
+    pdfplumber==0.11.4 \
+    pydantic==2.9.2 \
+    python-multipart==0.0.12 \
+    python-dotenv==1.0.1
+
+COPY aiml_hemalatha/ /app/
+
+EXPOSE 8003
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8003/health || exit 1
+
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]

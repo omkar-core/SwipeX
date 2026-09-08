@@ -130,7 +130,7 @@ class RedisCacheService:
         page_size: int,
         company_type: Optional[str],
         location: Optional[str],
-        remote: Optional[bool],
+        remote: Optional[str],
         salary_min: Optional[float],
         salary_max: Optional[float],
         skills: Optional[List[str]]

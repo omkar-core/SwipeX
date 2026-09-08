@@ -3,6 +3,7 @@ import { ResumeData, ATSScoreResult } from '../types';
 import { MOCK_INITIAL_RESUME } from '../data/mockData';
 import { ApiService } from '../services/api';
 import { useToast } from './ToastContext';
+import { useAuth } from './AuthContext';
 
 interface ResumeContextType {
   resume: ResumeData;
@@ -18,6 +19,7 @@ const ResumeContext = createContext<ResumeContextType | undefined>(undefined);
 
 export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [resume, setResume] = useState<ResumeData>(() => ApiService.getStoredResume());
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(78);
@@ -25,6 +27,15 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Fetch initial dynamic ATS score
   const fetchAtsScore = useCallback(async (jobId?: string): Promise<ATSScoreResult> => {
+    if (!resume.resume_id) {
+      // No uploaded resume yet — do not fire a doomed ATS request.
+      setAtsResult(null);
+      return {
+        match_score: 0,
+        missing_keywords: [],
+        generated_by: 'SwipeX-No-Resume',
+      };
+    }
     try {
       const res = await ApiService.getAtsScore(resume.resume_id, jobId);
       setAtsResult(res);
@@ -41,8 +52,9 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [resume.resume_id]);
 
   useEffect(() => {
+    if (!isAuthenticated || !resume.resume_id) return;
     fetchAtsScore();
-  }, [fetchAtsScore]);
+  }, [isAuthenticated, resume.resume_id, fetchAtsScore]);
 
   const uploadResumeFile = useCallback(async (file: File) => {
     setIsUploading(true);
@@ -93,10 +105,10 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [showToast]);
 
   const resetToDefaultResume = useCallback(() => {
-    setResume(MOCK_INITIAL_RESUME);
+    setResume({ ...MOCK_INITIAL_RESUME });
     setUploadProgress(78);
     fetchAtsScore();
-    showToast('Reset to demo resume', 'info');
+    showToast('No resume uploaded yet', 'info');
   }, [fetchAtsScore, showToast]);
 
   return (

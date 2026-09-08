@@ -47,7 +47,7 @@ def list_jobs(
     page_size: int = Query(20, ge=1, le=100, description="Page size limit (1 to 100)"),
     type: Optional[str] = Query(None, description="Company type filter"),
     location: Optional[str] = Query(None, description="Location substring filter"),
-    remote: Optional[bool] = Query(None, description="Filter remote work mode"),
+    remote: Optional[str] = Query(None, description="Comma-separated work modes: Remote,Hybrid,On-site"),
     salary_min: Optional[float] = Query(None, ge=0, description="Minimum salary boundary"),
     salary_max: Optional[float] = Query(None, ge=0, description="Maximum salary boundary"),
     skills: Optional[str] = Query(None, description="Comma-separated skill names"),
@@ -68,6 +68,11 @@ def list_jobs(
     skills_list: Optional[List[str]] = None
     if skills and skills.strip():
         skills_list = [s.strip() for s in skills.split(",") if s.strip()]
+
+    # Parse remote/work_mode parameter (CSV of Remote,Hybrid,On-site)
+    work_modes: Optional[List[str]] = None
+    if remote and remote.strip():
+        work_modes = [m.strip().upper().replace("-", "") for m in remote.split(",") if m.strip()]
 
     # Resolve optional user identity for personalized feed exclusion
     user_id: Optional[str] = None
@@ -111,7 +116,7 @@ def list_jobs(
         page_size=page_size,
         type_param=type,
         location_param=location,
-        remote_param=remote,
+        work_mode_param=work_modes,
         salary_min=salary_min,
         salary_max=salary_max,
         skills_param=skills_list,

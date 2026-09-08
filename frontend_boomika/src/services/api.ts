@@ -121,7 +121,7 @@ export class ApiService {
       user_id: userId,
       name: payload.name,
       email: payload.email,
-      role: payload.role || 'candidate',
+      role: payload.role || 'job_seeker',
       title: payload.role === 'recruiter' ? 'Talent Partner' : 'Senior Product Designer',
       tier: 'Tier 1 Talent',
       avatar: INITIAL_USER.avatar,
@@ -149,6 +149,11 @@ export class ApiService {
       );
       localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, data.access_token);
       localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, data.refresh_token);
+      // Persist login email so /auth/me (which only returns user_id/name/role) can build a full User.
+      const storedUserRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+      storedUser.email = payload.email;
+      localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(storedUser));
       return data;
     }
 
@@ -156,7 +161,7 @@ export class ApiService {
     await mockDelay(300);
     const accessToken = `mock_jwt_access_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     const refreshToken = `mock_jwt_refresh_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'candidate';
+    const role: UserRole = 'job_seeker';
 
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
@@ -194,7 +199,7 @@ export class ApiService {
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
     await mockDelay(350);
     const accessToken = `mock_jwt_google_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'candidate';
+    const role: UserRole = 'job_seeker';
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(INITIAL_USER));
     return {
@@ -209,10 +214,26 @@ export class ApiService {
    */
   static async getMe(token?: string): Promise<{ user_id: string; name: string; role: UserRole; user: User }> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<{ user_id: string; name: string; role: UserRole; user: User }>(
+      // Backend /auth/me returns a flat shape: { user_id, name, role }
+      const data = await httpRequest<{ user_id: string; name: string; role: UserRole }>(
         API_ENDPOINTS.AUTH.ME,
         { method: 'GET' }
       );
+      let stored: Partial<User> = {};
+      try {
+        const raw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+        if (raw) stored = JSON.parse(raw);
+      } catch { /* ignore malformed stored user */ }
+      return {
+        ...data,
+        user: {
+          ...stored,
+          user_id: data.user_id,
+          name: data.name,
+          email: stored.email || '',
+          role: data.role,
+        },
+      };
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
@@ -234,7 +255,7 @@ export class ApiService {
     if (API_CONFIG.USE_MOCK) {
       const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
       const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { total_users: 1, total_recruiters: user.role === 'recruiter' ? 1 : 0, total_job_seekers: user.role === 'candidate' ? 1 : 0, total_jobs: MOCK_JOBS.length, active_jobs: MOCK_JOBS.length, total_applications: 0, pending_items: 0 };
+      return { total_users: 1, total_recruiters: user.role === 'recruiter' ? 1 : 0, total_job_seekers: user.role === 'job_seeker' ? 1 : 0, total_jobs: MOCK_JOBS.length, active_jobs: MOCK_JOBS.length, total_applications: 0, pending_items: 0 };
     }
     return httpRequest<AdminDashboardData>(API_ENDPOINTS.ADMIN.DASHBOARD);
   }
@@ -277,7 +298,7 @@ export class ApiService {
     if (API_CONFIG.USE_MOCK) {
       const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
       const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { user_types: { candidates: user.role === 'candidate' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
+      return { user_types: { candidates: user.role === 'job_seeker' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
     }
     return httpRequest<AdminAnalyticsData>(API_ENDPOINTS.ADMIN.ANALYTICS);
   }
@@ -376,7 +397,7 @@ export class ApiService {
     if (!API_CONFIG.USE_MOCK) {
       return httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, direction: payload.direction.toUpperCase() }),
       });
     }
 
@@ -690,7 +711,33 @@ export class ProfileApiService {
 
   static async getProfile(): Promise<UserProfile> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<UserProfile>(API_ENDPOINTS.PROFILE.ME);
+      // The real backend exposes GET /auth/me returning a flat shape:
+      // { user_id, name, role }. Merge with any cached profile fields.
+      const data = await httpRequest<{ user_id: string; name: string; role: UserRole }>(API_ENDPOINTS.PROFILE.ME);
+let stored: Partial<User> = {};
+        try {
+          const raw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+          if (raw) stored = JSON.parse(raw);
+        } catch { /* ignore malformed stored user */ }
+      return {
+        user_id: data.user_id,
+        name: data.name,
+        email: stored.email || '',
+        role: data.role,
+        skills: stored.skills || [],
+        phone: stored.phone,
+        location: stored.location,
+        bio: stored.bio,
+        profile_picture_url: stored.profile_picture_url || stored.avatar,
+        experience_years: stored.experience_years,
+        resume_url: stored.resume_url,
+        current_title: stored.current_title,
+        expected_salary: stored.expected_salary,
+        job_type_preference: stored.job_type_preference,
+        company_name: stored.company_name,
+        company_website: stored.company_website,
+        designation: stored.designation,
+      };
     }
 
     // Mock Mode

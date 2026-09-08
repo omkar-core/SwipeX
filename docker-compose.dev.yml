@@ -1,0 +1,123 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: swipex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: swipex
+      POSTGRES_PASSWORD: swipex
+      POSTGRES_DB: swipex_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./integration_omkar/docker/postgres-init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swipex -d swipex_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - swipex-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: swipex-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - swipex-network
+
+  job-data-service:
+    build:
+      context: .
+      dockerfile: integration_omkar/docker/Dockerfile.job
+    container_name: swipex-job-data
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://swipex:swipex@postgres:5432/swipex_job
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-swipex-internal-gateway-secret}
+      TRUST_GATEWAY_HEADERS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - swipex-network
+
+  resume-service:
+    build:
+      context: .
+      dockerfile: integration_omkar/docker/Dockerfile.resume
+    container_name: swipex-resume-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    networks:
+      - swipex-network
+
+  auth-gateway:
+    build:
+      context: .
+      dockerfile: integration_omkar/docker/Dockerfile.auth
+    container_name: swipex-auth-gateway
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://swipex:swipex@postgres:5432/swipex_auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-key-123456789}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-dev-session-secret-key-987654321}
+      JOB_SERVICE_URL: http://job-data-service:8002
+      RESUME_SERVICE_URL: http://resume-service:8003
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      job-data-service:
+        condition: service_started
+      resume-service:
+        condition: service_started
+    networks:
+      - swipex-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: integration_omkar/docker/Dockerfile.frontend
+    container_name: swipex-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_BASE_API_URL: http://localhost:8001/api/v1
+      VITE_USE_MOCK: "false"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 5
+    depends_on:
+      - auth-gateway
+    networks:
+      - swipex-network
+
+volumes:
+  postgres_data:
+
+networks:
+  swipex-network:
+    driver: bridge

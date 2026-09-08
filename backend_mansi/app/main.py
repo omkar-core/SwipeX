@@ -3,6 +3,8 @@ Auth & Identity service — Day 3: real working logic behind every route.
 
 Run with:  uvicorn app.main:app --reload --port 8001
 """
+from dotenv import load_dotenv
+load_dotenv()
 import os
 from datetime import datetime
 

@@ -79,10 +79,18 @@ def test_gateway_forwards_swipe_creation_to_job_service():
 
 def test_gateway_rejects_unauthenticated_requests_before_forwarding():
     """
-    No token at all — the Gateway should reject this itself and never
-    even attempt to call the upstream Job service.
+    No token at all on a route that actually REQUIRES login — the Gateway
+    should reject this itself and never even attempt to call the upstream
+    Job service.
+
+    NOTE: this used to test GET /api/v1/jobs, but Milestone 2 deliberately
+    made job browsing PUBLIC (matching data_hanith's own "Public / Optional
+    Auth" contract) — see test_jobs_browsing_works_without_login in
+    test_m2_gateway.py for that new, correct behavior. This test now
+    checks POST /api/v1/swipes instead, which is still genuinely
+    restricted to logged-in Job Seekers.
     """
-    r = client.get("/api/v1/jobs")
+    r = client.post("/api/v1/swipes", json={"job_id": "1", "direction": "right"})
     assert r.status_code in (401, 403)
 
 

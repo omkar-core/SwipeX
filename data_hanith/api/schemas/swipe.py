@@ -13,8 +13,17 @@ class SwipeDirectionEnum(str, Enum):
 
 
 class SwipeCreateSchema(BaseModel):
-    job_id: str = Field(..., description="Target job UUID string")
-    direction: SwipeDirectionEnum = Field(..., description="Swipe direction ('RIGHT' or 'LEFT')")
+    job_id: str = Field(..., description="Target job UUID string", json_schema_extra={"example": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d"})
+    direction: SwipeDirectionEnum = Field(..., description="Swipe direction ('RIGHT' or 'LEFT')", json_schema_extra={"example": "RIGHT"})
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "job_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+                "direction": "RIGHT"
+            }
+        }
+    }
 
     @field_validator("job_id")
     @classmethod

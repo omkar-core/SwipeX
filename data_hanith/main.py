@@ -4,7 +4,7 @@ FastAPI ASGI application exposing job listings, details, and search endpoints.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import jobs, swipes
+from api.routers import jobs, swipes, companies
 
 app = FastAPI(
     title="SwipeX Job & Data Intelligence Service",
@@ -27,6 +27,7 @@ app.add_middleware(
 # Mount API Routers
 app.include_router(jobs.router)
 app.include_router(swipes.router)
+app.include_router(companies.router)
 
 
 @app.get("/health", tags=["Health"])

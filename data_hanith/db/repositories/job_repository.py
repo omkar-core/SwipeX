@@ -5,6 +5,7 @@ Handles database access and SQL execution for paginated job search, filtering, a
 from typing import List, Optional, Dict, Any
 from api.schemas.job import JobSummarySchema, JobDetailSchema, CompanyDetailSchema
 from db.connection import get_dict_cursor
+from services.job_indicators import compute_freshness_level, compute_competition_level
 
 
 def format_salary_range(min_sal: Optional[float], max_sal: Optional[float], currency: str = "INR") -> str:
@@ -131,7 +132,11 @@ class JobRepository:
                 j.min_salary,
                 j.max_salary,
                 j.currency,
-                j.posted_at_raw AS posted_at
+                j.posted_at_raw AS posted_at,
+                j.applicant_count,
+                j.competition_level,
+                j.posted_at_approx,
+                j.created_at
             FROM jobs j
             LEFT JOIN companies c ON j.company_id = c.id
             {where_sql}
@@ -161,6 +166,13 @@ class JobRepository:
             curr = str(r_dict["currency"]) if r_dict["currency"] else "INR"
 
             sal_range_str = format_salary_range(min_sal, max_sal, curr)
+            app_count = int(r_dict["applicant_count"]) if r_dict.get("applicant_count") is not None else 0
+            comp_lvl = r_dict.get("competition_level") or compute_competition_level(app_count)
+            fresh_lvl = compute_freshness_level(
+                posted_at_approx=r_dict.get("posted_at_approx"),
+                posted_at_raw=r_dict.get("posted_at"),
+                created_at=r_dict.get("created_at")
+            )
 
             job_list.append({
                 "job_id": j_id,
@@ -170,7 +182,10 @@ class JobRepository:
                 "location": r_dict["location"],
                 "salary_range": sal_range_str,
                 "skills": [],
-                "posted_at": r_dict["posted_at"]
+                "posted_at": r_dict["posted_at"],
+                "freshness_level": fresh_lvl,
+                "applicant_count": app_count,
+                "competition_level": comp_lvl,
             })
 
         # Batch fetch skills for jobs
@@ -217,6 +232,9 @@ class JobRepository:
                 j.job_type,
                 j.posted_at_raw,
                 j.posted_at_approx,
+                j.created_at,
+                j.applicant_count,
+                j.competition_level,
                 c.id AS company_id,
                 c.raw_company_id,
                 c.name AS company_name,
@@ -261,6 +279,13 @@ class JobRepository:
         max_sal = float(r["max_salary"]) if r["max_salary"] is not None else None
         curr = str(r["currency"]) if r["currency"] else "INR"
         sal_range_str = format_salary_range(min_sal, max_sal, curr)
+        app_count = int(r["applicant_count"]) if r.get("applicant_count") is not None else 0
+        comp_lvl = r.get("competition_level") or compute_competition_level(app_count)
+        fresh_lvl = compute_freshness_level(
+            posted_at_approx=r.get("posted_at_approx"),
+            posted_at_raw=r.get("posted_at_raw"),
+            created_at=r.get("created_at")
+        )
 
         return {
             "job_id": str(r["job_id"]),
@@ -280,5 +305,8 @@ class JobRepository:
             "job_type": r["job_type"],
             "posted_at_raw": r["posted_at_raw"],
             "posted_at_approx": str(r["posted_at_approx"]) if r["posted_at_approx"] is not None else None,
-            "skills": skill_names
+            "skills": skill_names,
+            "freshness_level": fresh_lvl,
+            "applicant_count": app_count,
+            "competition_level": comp_lvl,
         }

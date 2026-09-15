@@ -19,6 +19,7 @@ import os
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
+from typing import Optional
 from app.deps import get_current_user, get_optional_current_user, require_role
 from app.models import User
 
@@ -41,16 +42,23 @@ def _matching_engine_url() -> str:
     return os.getenv("MATCHING_ENGINE_URL", "http://localhost:8004")
 
 
-async def _proxy(request: Request, base_url: str, path: str) -> Response:
+async def _proxy(request: Request, base_url: str, path: str, current_user: Optional[User] = None) -> Response:
     """Forwards the incoming request to the target service and relays its response."""
     url = f"{base_url}{path}"
+    params = None if "?" in path else request.query_params
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    if current_user:
+        headers["X-User-Id"] = str(current_user.id)
+        headers["X-User-Role"] = str(current_user.role.value)
+        headers["X-Gateway-Secret"] = os.getenv("GATEWAY_SHARED_SECRET", "swipex-internal-gateway-secret")
+
     async with httpx.AsyncClient() as client:
         try:
             upstream = await client.request(
                 method=request.method,
                 url=url,
-                params=request.query_params,
-                headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
+                params=params,
+                headers=headers,
                 content=await request.body(),
                 timeout=10.0,
             )
@@ -72,13 +80,13 @@ async def _proxy(request: Request, base_url: str, path: str) -> Response:
 # ---------------------------------------------------------------------------
 
 @router.get("/api/v1/jobs")
-async def gateway_list_jobs(request: Request, current_user: User = Depends(get_optional_current_user)):
-    return await _proxy(request, _job_service_url(), "/api/v1/jobs")
+async def gateway_list_jobs(request: Request, current_user: Optional[User] = Depends(get_optional_current_user)):
+    return await _proxy(request, _job_service_url(), "/api/v1/jobs", current_user)
 
 
 @router.get("/api/v1/jobs/{job_id}")
-async def gateway_job_detail(job_id: str, request: Request, current_user: User = Depends(get_optional_current_user)):
-    return await _proxy(request, _job_service_url(), f"/api/v1/jobs/{job_id}")
+async def gateway_job_detail(job_id: str, request: Request, current_user: Optional[User] = Depends(get_optional_current_user)):
+    return await _proxy(request, _job_service_url(), f"/api/v1/jobs/{job_id}", current_user)
 
 
 @router.get("/api/v1/jobs/search")
@@ -97,12 +105,12 @@ async def gateway_create_swipe(
     request: Request,
     current_user: User = Depends(require_role("job_seeker")),
 ):
-    return await _proxy(request, _job_service_url(), "/api/v1/swipes")
+    return await _proxy(request, _job_service_url(), "/api/v1/swipes", current_user)
 
 
 @router.get("/api/v1/swipes/history")
 async def gateway_swipe_history(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, _job_service_url(), "/api/v1/swipes/history")
+    return await _proxy(request, _job_service_url(), "/api/v1/swipes/history", current_user)
 
 
 # ---------------------------------------------------------------------------

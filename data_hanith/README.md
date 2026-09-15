@@ -154,7 +154,16 @@ The database schema (`db/schema.sql`) consists of 5 normalized relational tables
 
 ### `GET /api/v1/jobs/{job_id}`
 - **Public / Optional Auth**: Yes
-- **Description**: Returns detailed job object (`JobDetailSchema`) including full description, salary bounds, experience requirements, and nested company details. `job_id` must be a valid UUID string.
+- **Description**: Returns detailed job object (`JobDetailSchema`) including full description, salary bounds, experience requirements, indicators (`freshness_level`, `competition_level`), and nested company details. `job_id` must be a valid UUID string.
+
+### `GET /api/v1/companies`
+- **Public**: Yes
+- **Description**: Returns paginated summary list of company profiles (`CompanySummarySchema`).
+- **Query Parameters**: `page` (default 1), `page_size` (default 20, max 100), `industry` (substring filter), `newly_founded` (boolean filter).
+
+### `GET /api/v1/companies/{company_id}`
+- **Public**: Yes
+- **Description**: Returns detailed company profile (`CompanyDetailSchema`) including company size, industry, about text, newly founded status, and dynamically aggregated `active_job_count`.
 
 ### `POST /api/v1/swipes`
 - **Protected**: Requires `Job Seeker` role
@@ -177,14 +186,23 @@ The service defines an explicit authentication boundary in `api/dependencies.py`
 3. **Internal API Gateway Identity Headers**: Forwarded requests from the trusted API Gateway supply `X-User-Id`, `X-User-Role`, and `X-Gateway-Secret`. If `X-Gateway-Secret` matches `GATEWAY_SHARED_SECRET` (or `TRUST_GATEWAY_HEADERS="true"`), the service trusts the Gateway-injected identity. Direct client header forgery without the secret is rejected with 401 Unauthorized.
 4. **Role Authorization (RBAC)**: Endpoint `require_job_seeker` verifies `current_user.role in ("Job Seeker", "job_seeker")`. Recruiter and Admin roles attempting to swipe receive 403 Forbidden.
 
-## 11. Redis Caching and PostgreSQL Fallback
-Implemented in `db/cache.py` (`RedisCacheService`):
-- **User Swiped Job ID Cache (`swiped_jobs:{user_id}`)**: Stores set of swiped job UUIDs per user for fast $O(1)$ feed exclusion.
-- **Feed Result Cache (`job_feed:...`)**: Caches query results using MD5 parameter hash keys with a 5-minute TTL.
-- **Cache Invalidation**: Posting a new swipe automatically invalidates the user's cached feed keys.
-- **Graceful PostgreSQL Fallback**: Redis is treated strictly as a performance acceleration layer. If Redis is unavailable or times out, the service logs a warning and executes queries directly against PostgreSQL/SQLite without error or data loss.
+## 11. Indicators & Heuristics
+- **Job Freshness**: Computed dynamically at query/API runtime relative to baseline date:
+  - `FRESH`: 0–7 days (future postings clamped to age 0)
+  - `RECENT`: 8–14 days
+  - `AGING`: 15–30 days
+  - `STALE`: >30 days
+- **Job Competition Level**: Calculated from applicant density:
+  - `LOW`: <10 applicants
+  - `MEDIUM`: 10–50 applicants
+  - `HIGH`: >50 applicants
 
-## 12. Running the Service
+## 12. Backup, Restore & Performance Utilities
+- **Database Backup**: `python data_hanith/scripts/backup_postgres.py` (Generates custom pg_dump archives with TOC verification).
+- **Isolated Restore QA**: `python data_hanith/scripts/validate_day5_backup_restore.py` (Validates restore into isolated `swipex_job_db_test_restore`).
+- **Integrity & Performance QA**: `python data_hanith/scripts/validate_day6_qa_performance.py` (Audits FK integrity, EXPLAIN ANALYZE SQL execution timings, and API response latencies).
+
+## 13. Running the Service
 Run the service standalone using Uvicorn on port `8002`:
 ```bash
 cd data_hanith
@@ -192,30 +210,21 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8002
 ```
 Documentation UI is accessible at `http://127.0.0.1:8002/docs`.
 
-## 13. Running the Tests
-Run the automated test suite from the repository root:
+## 14. Running the Tests
+Run the complete automated test suite from the repository root:
 ```bash
-pytest tests/ -v
+$env:DATABASE_URL="postgresql://postgres@127.0.0.1:5432/swipex_job_db"; python -m pytest tests/
 ```
-All **61 tests** in `tests/` (`test_dataset1_ingestion.py`, `test_job_api.py`, `test_redis_cache.py`, `test_swipe_api.py`) validate ingestion rules, API contracts, RBAC boundary, feed exclusion, and Redis fallback.
+All **88 tests** in `tests/` validate dataset ingestion rules, FastAPI endpoints, RBAC boundaries, company profiles, freshness/competition indicators, feed exclusion caching, concurrency locking, cascade FKs, deep pagination, and Redis fallbacks.
 
-## 14. Gateway Integration
-The API Gateway (owned by Intern 1 under `backend_mansi`) proxies external client requests to this service running at `JOB_SERVICE_URL` (`http://localhost:8002`):
-- `GET /api/v1/jobs` -> proxied to `http://localhost:8002/api/v1/jobs`
-- `GET /api/v1/jobs/{job_id}` -> proxied to `http://localhost:8002/api/v1/jobs/{job_id}`
-- `POST /api/v1/swipes` -> proxied to `http://localhost:8002/api/v1/swipes`
-- `GET /api/v1/swipes/history` -> proxied to `http://localhost:8002/api/v1/swipes/history`
-
-The Gateway verifies user tokens and forwards the `Authorization: Bearer <token>` header downstream to `data_hanith`.
-
-## 15. Recommendation / Data Handoff
-For Intern 3 (Recommendation / ML Engineer):
-- Complete data schema, field descriptions, recommendation signals, skill graphs, and API usage guidelines are documented in [`../docs/m2-data-feed-notes.md`](../docs/m2-data-feed-notes.md).
-- Use `GET /api/v1/swipes/history` to retrieve user implicit interest signals (`RIGHT` swipes).
-- Use `jobs.skills` array and `job_description` text payloads for candidate profile matching.
+## 15. Recommendation & Matching Engine Handoff (M3)
+For Intern 4 (Matching Engine / AI-ML System):
+- Complete architectural specifications, schema designs, indicator heuristics, and QA benchmarks are documented in [`docs/m2_final_architecture_and_qa.md`](docs/m2_final_architecture_and_qa.md).
+- Dedicated handoff guidelines, consumable feature definitions, skill graphs, swipe signals, and data access rules are documented in [`docs/m3_matching_engine_handoff.md`](docs/m3_matching_engine_handoff.md).
 
 ## 16. Known Limitations / Technical Risks
-1. **Unpopulated Fields**: Dataset 1 does not contain data for `company_type`, `work_mode`, or `job_type`.
-2. **Undisclosed Salaries**: 64,700 jobs have `NULL` salary fields.
-3. **`passlib` / `bcrypt` Package Compatibility**: In Python 3.14 environments, `passlib` requires `bcrypt < 4.0.0` to avoid password byte length initialization errors.
-4. **PostgreSQL as Primary Source of Truth**: Do not rely on Redis for persistent state. All durable data resides in PostgreSQL/SQLite.
+1. **Unpopulated Dataset 1 Fields**: Dataset 1 does not contain data for `company_type`, `work_mode`, or `job_type` (all NULL).
+2. **Undisclosed Salaries**: 64,700 jobs have `NULL` salary fields (filtered out when explicit salary min/max parameters are provided).
+3. **Future Start Posting Dates**: 571 jobs have raw text like `"Starts in 1-3 months"` (`posted_at_approx IS NULL`), classified as `FRESH` by heuristic fallback.
+4. **Development Database Swipes**: The live database contains accumulated test swipes from Days 1-6 testing, which are preserved.
+5. **PostgreSQL as Primary Source of Truth**: All durable data resides in PostgreSQL. Redis is treated strictly as an acceleration layer.

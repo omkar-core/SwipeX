@@ -71,12 +71,18 @@ def init_db(db_url: str, schema_sql_path: str = None):
                 company_type TEXT NULL,
                 aggregate_rating REAL NULL,
                 reviews_count INTEGER NULL,
+                about TEXT NULL,
+                size TEXT NULL,
+                industry TEXT NULL,
+                is_newly_founded INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS idx_companies_raw_id ON companies(raw_company_id);
             CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
+            CREATE INDEX IF NOT EXISTS idx_companies_newly_founded ON companies(is_newly_founded);
+            CREATE INDEX IF NOT EXISTS idx_companies_industry ON companies(industry);
 
             CREATE TABLE IF NOT EXISTS jobs (
                 id TEXT PRIMARY KEY,
@@ -93,6 +99,8 @@ def init_db(db_url: str, schema_sql_path: str = None):
                 location TEXT NOT NULL,
                 work_mode TEXT NULL,
                 job_type TEXT NULL,
+                applicant_count INTEGER NOT NULL DEFAULT 0,
+                competition_level TEXT NOT NULL DEFAULT 'LOW' CHECK (competition_level IN ('LOW', 'MEDIUM', 'HIGH')),
                 posted_at_raw TEXT NOT NULL,
                 posted_at_approx TEXT NULL,
                 created_at TEXT NOT NULL,
@@ -106,6 +114,8 @@ def init_db(db_url: str, schema_sql_path: str = None):
             CREATE INDEX IF NOT EXISTS idx_jobs_salary ON jobs(min_salary, max_salary);
             CREATE INDEX IF NOT EXISTS idx_jobs_experience ON jobs(min_experience, max_experience);
             CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC, id ASC);
+            CREATE INDEX IF NOT EXISTS idx_jobs_competition ON jobs(competition_level);
+            CREATE INDEX IF NOT EXISTS idx_jobs_applicant_count ON jobs(applicant_count);
 
             CREATE TABLE IF NOT EXISTS skills (
                 id TEXT PRIMARY KEY,
@@ -135,6 +145,18 @@ def init_db(db_url: str, schema_sql_path: str = None):
 
             CREATE INDEX IF NOT EXISTS idx_swipes_user_id ON swipes(user_id);
             CREATE INDEX IF NOT EXISTS idx_swipes_user_job ON swipes(user_id, job_id);
+
+            CREATE TABLE IF NOT EXISTS saved_jobs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                saved_at TEXT NOT NULL,
+                notes TEXT NULL,
+                UNIQUE (user_id, job_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id ON saved_jobs(user_id);
+            CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_job ON saved_jobs(user_id, job_id);
         """)
         conn.commit()
 

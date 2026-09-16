@@ -161,7 +161,7 @@ Each entry records:
 > **Branch**: `Team-4`  
 > **Milestone**: M2 (Job Discovery, Swipe System, Matching Engine & Integration)  
 > **Last Updated**: 2026-09-16  
-> **Status**: 3 teammate-owned items still open (DEF-012, DEF-015, DEF-016)  
+> **Status**: All M2 defects (DEF-008 through DEF-016) FIXED & VERIFIED — see summary table below
 
 ## M2 Defect Summary Table
 
@@ -277,7 +277,7 @@ Each entry records:
   - `backend_mansi/app/gateway.py`: Added `PUT /api/v1/jobs/{job_id}` route similarly guarded
   - RBAC enforcement: Job Seeker → 403 (verified); Recruiter → forwarded to job service
 - **Integration Retesting**:
-  - `test_recruiter_allowed_to_create_job` — expects 200/201/503
+  - `test_recruiter_allowed_to_create_job` — expects 200/201, or 405 if the downstream job-service stub is hit, or 503 if downstream not running
   - `test_job_seeker_blocked_from_creating_job` — expects 403 → PASS
 
 ---

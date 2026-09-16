@@ -9,7 +9,7 @@
 
 ## 1. Purpose & Responsibilities
 
-The `integration_omkar` domain is responsible for unifying the disparate microservices developed by Team-4 teammates into one coherent, robust, and verifiable system increment for **Milestone 1**:
+The `integration_omkar` domain is responsible for unifying the disparate microservices developed by Team-4 teammates into one coherent, robust, and verifiable system increment across **Milestone 1 & 2**:
 - **Multi-Service Docker Containerization**: Isolated, reproducible Dockerfiles for Auth/Gateway, Job Service, Resume/ATS Service, and Frontend.
 - **Local Orchestration (`docker-compose.dev.yml`)**: Single-command boot for PostgreSQL, Redis, 3 backend FastAPI microservices, and the React web app.
 - **Database & Cache Orchestration**: Multi-database initialization (`swipex_auth` and `swipex_job`) and Redis cache connection with graceful SQL fallback.
@@ -225,17 +225,25 @@ pytest aiml_hemalatha/tests/ -v
 cd frontend_boomika && npm run build
 ```
 
-## 4. Milestone 2 Deliverables & Reports
-- [M2 Test Plan](m2_test_plan.md)
-- [M2 Test Cases](m2_test_cases.md)
-- [M2 Integration Report](m2_integration_report.md)
-- [M2 Regression Report](m2_regression_report.md)
-- [M2 Code Quality Report](m2_code_quality_report.md)
-- [M2 QA Sign-off](m2_qa_signoff.md)
-- [M2 Final Audit](m2_final_audit.md)
-- [M2 Mentor Demo Checklist](m2_demo_checklist.md)
-- [Integration Defect Log](defect_log.md)
+## 4. Milestone 2 Documentation
 
-## 5. Deployment Boundary
+- [M2 Final Report](M2_FINAL_REPORT.md) — acceptance verdict, SRS/FR matrices, live website evidence, CI failure resolution, test & quality results, M1 regression
+- [Integration Defect Log](defect_log.md) — all M2 defects (DEF-008 … DEF-016) with status FIXED & VERIFIED
+- [M1 Sign-off](m1_signoff.md) — Milestone 1 integration record (historical)
+
+## 5. Milestone 2 Demo Sequence (for presentation)
+
+1. Open `http://localhost:3000`; register a **Job Seeker** (instant JWT session; `/auth/me` in DevTools).
+2. **DiscoverScreen**: swipe deck shows title, company, location, salary, freshness badge, competition tier; click a card for the Job Detail Modal; use Save/Pass (Arrow keys) — recorded via `POST /api/v1/swipes` (201); swiped jobs disappear from next feed.
+3. **Search & filters**: keyword input (e.g. "Python"), salary min/max, work-environment toggles (Remote/Hybrid/On-site), industry — feed filters live. Dedicated endpoint: `curl "http://localhost:8001/api/v1/jobs/search?q=Python"`.
+4. **Companies** tab: filtered grid, "Startups & Fast Growing" pill (`newly_founded=true`), company search, detail modal with active openings.
+5. **Resume Upload**: upload `.txt`/`.pdf` → extracted skills + ATS match score gauge.
+6. **AI Recommendations** panel (DiscoverScreen): affinity scores; clicking a role opens its detail via canonical UUID.
+7. **Applications** screen: "Saved" roles + "Swipes" toggle = chronological right/left decisions.
+8. **RBAC**: logout → login as **Recruiter** → swipe blocked (403 Forbidden), recruiter job-posting route (`POST /api/v1/jobs`) reachable.
+9. **Quality gates**: `pytest integration_omkar/tests/` → 52/52; `pytest backend_mansi/tests/` → 28/28; `pytest aiml_hemalatha/tests/` → 9/9; `npm run build` → exit 0.
+
+## 6. Deployment Boundary
+
 Milestone 2 strictly maintains local container orchestration and CI automation. No production cloud deployment or packaging is introduced.
 

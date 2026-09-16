@@ -1,0 +1,212 @@
+{
+  "info": {
+    "name": "SwipeX — Milestone 2 (Auth + Gateway)",
+    "description": "Day 5 deliverable: every Milestone 2 endpoint behind the API Gateway. Import: File > Import > select this file. Run 'Login' first — it auto-saves the token for every other request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8001" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "job_id", "value": "" },
+    { "key": "company_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register (Job Seeker)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Seeker\",\n  \"email\": \"seeker@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"job_seeker\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
+          }
+        },
+        {
+          "name": "Register (Recruiter)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Recruiter\",\n  \"email\": \"recruiter@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"recruiter\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] }
+          }
+        },
+        {
+          "name": "Login (saves token automatically)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('access_token', b.access_token);",
+              "pm.collectionVariables.set('refresh_token', b.refresh_token);"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"seeker@example.com\",\n  \"password\": \"password123\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/auth/me", "host": ["{{base_url}}"], "path": ["api","v1","auth","me"] }
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/refresh", "host": ["{{base_url}}"], "path": ["api","v1","auth","refresh"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Jobs (public browsing)",
+      "item": [
+        {
+          "name": "List jobs — no login needed",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/jobs?page=1&page_size=20", "host": ["{{base_url}}"], "path": ["api","v1","jobs"], "query": [{"key":"page","value":"1"},{"key":"page_size","value":"20"}] }
+          }
+        },
+        {
+          "name": "List jobs — logged in (excludes swiped)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/jobs", "host": ["{{base_url}}"], "path": ["api","v1","jobs"] }
+          }
+        },
+        {
+          "name": "Job detail",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/jobs/{{job_id}}", "host": ["{{base_url}}"], "path": ["api","v1","jobs","{{job_id}}"] }
+          }
+        },
+        {
+          "name": "Search jobs",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/jobs/search?q=python&location=Pune", "host": ["{{base_url}}"], "path": ["api","v1","jobs","search"], "query": [{"key":"q","value":"python"},{"key":"location","value":"Pune"}] }
+          }
+        },
+        {
+          "name": "Filtered jobs (salary + skills)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/jobs?salary_min=500000&skills=python,sql", "host": ["{{base_url}}"], "path": ["api","v1","jobs"], "query": [{"key":"salary_min","value":"500000"},{"key":"skills","value":"python,sql"}] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Swipes (Job Seeker only)",
+      "item": [
+        {
+          "name": "Swipe right — lowercase, Gateway upper-cases it",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"direction\": \"right\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/swipes", "host": ["{{base_url}}"], "path": ["api","v1","swipes"] }
+          }
+        },
+        {
+          "name": "Swipe history",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/swipes/history", "host": ["{{base_url}}"], "path": ["api","v1","swipes","history"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Companies (public)",
+      "item": [
+        {
+          "name": "List companies",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/companies", "host": ["{{base_url}}"], "path": ["api","v1","companies"] }
+          }
+        },
+        {
+          "name": "Company detail",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/companies/{{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","companies","{{company_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Recruiter job posting (RBAC)",
+      "item": [
+        {
+          "name": "Create job — as Recruiter (expect 201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Backend Engineer\",\n  \"job_description\": \"Build APIs\",\n  \"location\": \"Remote\",\n  \"min_salary\": 600000,\n  \"max_salary\": 1200000,\n  \"skills\": [\"python\", \"fastapi\"]\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/jobs", "host": ["{{base_url}}"], "path": ["api","v1","jobs"] }
+          }
+        },
+        {
+          "name": "Create job — as Job Seeker (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Should be blocked\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/jobs", "host": ["{{base_url}}"], "path": ["api","v1","jobs"] }
+          }
+        },
+        {
+          "name": "Update job — as Recruiter",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Senior Backend Engineer\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/jobs/{{job_id}}", "host": ["{{base_url}}"], "path": ["api","v1","jobs","{{job_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Recommendations (Matching Engine)",
+      "item": [
+        {
+          "name": "Get recommendations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/recommendations", "host": ["{{base_url}}"], "path": ["api","v1","recommendations"] }
+          }
+        }
+      ]
+    }
+  ]
+}

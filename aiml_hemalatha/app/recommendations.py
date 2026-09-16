@@ -4,11 +4,8 @@ from app.ats import calculate_ats_score
 
 def get_recommendations(resume_skills, limit=10):
     """
-    Generate job recommendations using simple rule-based
-    skill matching.
-
-    This implementation is heuristic-based and does not use
-    a trained AI or Machine Learning model.
+    Generate job recommendations using
+    rule-based skill matching.
     """
 
     jobs = get_jobs()
@@ -17,37 +14,88 @@ def get_recommendations(resume_skills, limit=10):
 
     for _, job in jobs.iterrows():
 
-        # Calculate skill match between resume and job
         result = calculate_ats_score(
             resume_skills,
             job["required_skills"]
         )
 
+        reason_tags = []
+
+        if result["matched_skills"]:
+
+            if result["score"] >= 70:
+
+                reason_tags.append(
+                    "Strong skill match"
+                )
+
+            else:
+
+                reason_tags.append(
+                    "Matches your skills"
+                )
+
+        else:
+
+            reason_tags.append(
+                "Low skill match"
+            )
+
+        # Handle salary column safely
+        salary = job.get(
+            "Salary",
+            job.get("salary", 0)
+        )
+
+        monthly_salary = job.get(
+            "Monthly Salary",
+            job.get("monthly_salary", 0)
+        )
+
         recommendation = {
-            "job_id": str(job["job_id"]),
-            "title": job["Job Title"],
-            "required_skills": job["required_skills"],
-            "matched_skills": result["matched_skills"],
-            "missing_skills": result["missing_skills"],
-            "match_score": result["score"]
+
+            "job_id": str(
+                job["job_id"]
+            ),
+
+            "title": str(
+                job["job_title"]
+            ),
+
+            "required_skills":
+                job["required_skills"],
+
+            "matched_skills":
+                result["matched_skills"],
+
+            "missing_skills":
+                result["missing_skills"],
+
+            "match_score":
+                result["score"],
+
+            "reason_tags":
+                reason_tags,
+
+            "location":
+                str(job["location"]),
+
+            "salary":
+                salary,
+
+            "monthly_salary":
+                monthly_salary
         }
 
-        # Add optional columns only if they exist
-        if "Location" in job.index:
-            recommendation["location"] = job["Location"]
+        recommendations.append(
+            recommendation
+        )
 
-        if "Salary" in job.index:
-            recommendation["salary"] = job["Salary"]
-
-        if "Monthly Salary" in job.index:
-            recommendation["monthly_salary"] = job["Monthly Salary"]
-
-        recommendations.append(recommendation)
-
-    # Highest matching jobs first
     recommendations.sort(
         key=lambda x: x["match_score"],
         reverse=True
     )
 
     return recommendations[:limit]
+
+

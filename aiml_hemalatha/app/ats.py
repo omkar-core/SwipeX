@@ -9,46 +9,103 @@ def calculate_ats_score(resume_skills, required_skills):
     resume_skills = resume_skills or []
     required_skills = required_skills or []
 
-    # Normalize resume skills
-    normalized_resume_skills = {
-        str(skill).lower().strip()
+    # Convert resume skills to lowercase
+    resume_skills = [
+        str(skill).strip().lower()
         for skill in resume_skills
-        if str(skill).strip()
-    }
+    ]
 
-    # Normalize required skills
-    normalized_required_skills = {
-        str(skill).lower().strip()
-        for skill in required_skills
-        if str(skill).strip()
-    }
+    # -------------------------------------------------
+    # Convert required skills into a weighted dictionary
+    # -------------------------------------------------
 
-    # Find matched skills
-    matched_skills = (
-        normalized_resume_skills
-        .intersection(normalized_required_skills)
-    )
+    if isinstance(required_skills, list):
 
-    # Find missing skills
-    missing_skills = (
-        normalized_required_skills
-        - normalized_resume_skills
-    )
+        # Default weights
+        default_weights = {
+            "python": 40,
+            "sql": 25,
+            "fastapi": 20,
+            "git": 10,
+            "java": 30,
+            "html": 10,
+            "css": 10,
+            "javascript": 20,
+            "machine learning": 30,
+            "data analysis": 25,
+            "excel": 10,
+            "power bi": 20,
+            "react": 20,
+            "node.js": 20,
+            "c++": 30,
+            "c": 20
+        }
 
-    # Calculate score
-    if not normalized_required_skills:
-        score = 0.0
+        weighted_skills = {}
+
+        for skill in required_skills:
+            skill = str(skill).strip().lower()
+
+            # Use predefined weight if available
+            # Otherwise give default weight of 10
+            weighted_skills[skill] = default_weights.get(skill, 10)
+
+        required_skills = weighted_skills
+
+    # If required_skills is already a dictionary
+    elif isinstance(required_skills, dict):
+
+        required_skills = {
+            str(skill).strip().lower(): weight
+            for skill, weight in required_skills.items()
+        }
+
     else:
-        score = round(
-            (
-                len(matched_skills)
-                / len(normalized_required_skills)
-            ) * 100,
-            2
-        )
+        required_skills = {}
+
+    # -------------------------------------------------
+    # Calculate total weight
+    # -------------------------------------------------
+
+    total_weight = sum(required_skills.values())
+
+    if total_weight == 0:
+        return {
+            "score": 0,
+            "matched_skills": [],
+            "missing_skills": []
+        }
+
+    # -------------------------------------------------
+    # Match resume skills with job skills
+    # -------------------------------------------------
+
+    matched_skills = []
+    missing_skills = []
+    matched_weight = 0
+
+    for skill, weight in required_skills.items():
+
+        if skill in resume_skills:
+            matched_skills.append(skill)
+            matched_weight += weight
+        else:
+            missing_skills.append(skill)
+
+    # -------------------------------------------------
+    # Calculate ATS percentage
+    # -------------------------------------------------
+
+    score = round(
+        (matched_weight / total_weight) * 100,
+        2
+    )
+
+    # Make sure score is between 0 and 100
+    score = min(max(score, 0), 100)
 
     return {
         "score": score,
-        "matched_skills": sorted(matched_skills),
-        "missing_skills": sorted(missing_skills)
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills
     }

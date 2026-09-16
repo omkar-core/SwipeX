@@ -19,6 +19,7 @@ This service is responsible for:
 - Preparing the system for advanced AI/ML recommendation in Milestone 3.
 
 ##3. Project Structure
+
 AI-Career-intelligence/
 └── backend/
     ├── app/

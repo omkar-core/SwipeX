@@ -91,7 +91,7 @@ def test_recommendation_contains_matched_skills(monkeypatch):
         "git"
     ]
 
-    assert result[0]["match_score"] == 66.67
+    assert result[0]["match_score"] == 86.67
 
 
 def test_recommendation_limit(monkeypatch):

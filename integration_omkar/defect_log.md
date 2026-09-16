@@ -344,6 +344,30 @@ Each entry records:
 
 ---
 
+### DEF-017: aiml_hemalatha Unit Tests Failing (5 tests broken)
+- **Date Found**: 2026-09-16
+- **Component**: `aiml_hemalatha/app/recommendations.py`, `aiml_hemalatha/tests/test_ats.py`, `aiml_hemalatha/tests/test_recommendations.py`
+- **Severity**: **High**
+- **Responsible Owner**: Hemalatha (Intern 4 — AI/ML)
+- **Status**: **FIXED** ✅
+- **Description**:
+  5 tests failing in CI (Backend Unit & Contract Tests):
+  1. `test_ats.py::test_partial_skills_match` — `assert 68.42 == 50.0` (weighted ATS algorithm changed but test expectation not updated)
+  2. `test_recommendations.py` (4 tests) — `KeyError: 'job_title'` and `KeyError: 'location'` because test fixtures use capitalized column names (`Job Title`, `Location`) while code expects lowercase (`job_title`, `location`). Additionally, `test_recommendation_contains_matched_skills` expected `match_score == 66.67` but the weighted algorithm produces `86.67`.
+- **Root Cause**:
+  - `job_data.py` normalizes CSV columns to `job_title`/`location`, but test monkeypatched DataFrames bypass normalization and use raw capitalized column names.
+  - ATS scoring switched from simple ratio to weighted scoring (python=40, sql=25, git=10, etc.) but test expectations were not updated.
+- **Resolution**:
+  - Added `normalize_column_name()` helper in `recommendations.py` to rename `Job Title`→`job_title` and `Location`→`location` on incoming DataFrames
+  - Added `.get()` fallbacks for `job_title`, `location`, `required_skills` with safe defaults
+  - Updated `test_ats.py` line 22: `50.0` → `pytest.approx(68.42, rel=0.01)`
+  - Updated `test_recommendations.py` line 94: `66.67` → `86.67` (correct weighted score)
+  - Created integration validation test in `integration_omkar/tests/unit/test_aiml_fixes.py` (3 tests)
+- **Verified By**: Omkar (Intern 5 — Integration)
+- **Verification**: `pytest aiml_hemalatha/tests -v` → 9/9 passed; `pytest integration_omkar/tests/unit/test_aiml_fixes.py -v` → 3/3 passed
+
+---
+
 ## Open Defect Summary (M2 — as of 2026-09-16)
 
 | Count | Severity | Owner | Items |
@@ -352,4 +376,4 @@ Each entry records:
 | 0 | **MEDIUM OPEN** | — | *(all MEDIUM defects fixed)* |
 | 0 | **LOW OPEN** | — | *(all LOW defects fixed)* |
 
-**M2 Sign-off condition**: All M2 defects (DEF-008 through DEF-016) are now **FIXED & VERIFIED**. M2 is ready for final QA sign-off and completion declaration.
+**M2 Sign-off condition**: All M2 defects (DEF-008 through DEF-017) are now **FIXED & VERIFIED**. M2 is ready for final QA sign-off and completion declaration.

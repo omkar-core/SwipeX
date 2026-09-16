@@ -2,6 +2,13 @@ from app.job_data import get_jobs
 from app.ats import calculate_ats_score
 
 
+def normalize_column_name(df, old_name, new_name):
+    """Rename column if exists, for test/prod compatibility"""
+    if old_name in df.columns and new_name not in df.columns:
+        df = df.rename(columns={old_name: new_name})
+    return df
+
+
 def get_recommendations(resume_skills, limit=10):
     """
     Generate job recommendations using
@@ -10,13 +17,17 @@ def get_recommendations(resume_skills, limit=10):
 
     jobs = get_jobs()
 
+    # Normalize column names for test compatibility
+    jobs = normalize_column_name(jobs, "Job Title", "job_title")
+    jobs = normalize_column_name(jobs, "Location", "location")
+
     recommendations = []
 
     for _, job in jobs.iterrows():
 
         result = calculate_ats_score(
             resume_skills,
-            job["required_skills"]
+            job.get("required_skills", [])
         )
 
         reason_tags = []
@@ -52,6 +63,16 @@ def get_recommendations(resume_skills, limit=10):
             job.get("monthly_salary", 0)
         )
 
+        job_title = job.get(
+            "job_title",
+            job.get("Job Title", "Unknown")
+        )
+
+        location = job.get(
+            "location",
+            job.get("Location", "")
+        )
+
         recommendation = {
 
             "job_id": str(
@@ -59,11 +80,11 @@ def get_recommendations(resume_skills, limit=10):
             ),
 
             "title": str(
-                job["job_title"]
+                job_title
             ),
 
             "required_skills":
-                job["required_skills"],
+                job.get("required_skills", []),
 
             "matched_skills":
                 result["matched_skills"],
@@ -78,7 +99,7 @@ def get_recommendations(resume_skills, limit=10):
                 reason_tags,
 
             "location":
-                str(job["location"]),
+                str(location),
 
             "salary":
                 salary,

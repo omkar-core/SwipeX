@@ -23,70 +23,110 @@ CURATED_SEED_JOBS = [
         "company": "Nexus Technologies",
         "company_rating": 4.5,
         "company_reviews": 128,
+        "company_about": "Leading provider of scalable web solutions and enterprise cloud platforms.",
+        "company_size": "50-200",
+        "company_industry": "Information Technology",
+        "company_is_newly_founded": False,
         "location": "Bangalore, India",
-        "min_salary": 1800000.0,
-        "max_salary": 2500000.0,
+        "min_salary": 250000.0,
+        "max_salary": 270000.0,
         "currency": "INR",
         "min_exp": 3.0,
         "max_exp": 6.0,
+        "work_mode": "REMOTE",
+        "job_type": "FULL_TIME",
         "skills": ["Python", "FastAPI", "React", "TypeScript", "PostgreSQL", "Docker"],
-        "description": "Join Nexus Technologies to architect modern swipe-based web platforms using FastAPI and React."
+        "description": "Join Nexus Technologies to architect modern swipe-based web platforms using FastAPI and React.",
+        "applicant_count": 45,
+        "competition_level": "MEDIUM"
     },
     {
         "title": "AI/ML Solutions Architect",
         "company": "HyperScale AI Labs",
         "company_rating": 4.8,
         "company_reviews": 310,
+        "company_about": "Pioneering artificial intelligence and deep learning models for next-gen automation.",
+        "company_size": "20-50",
+        "company_industry": "Artificial Intelligence",
+        "company_is_newly_founded": True,
         "location": "Hyderabad, India",
-        "min_salary": 2200000.0,
-        "max_salary": 3200000.0,
+        "min_salary": 230000.0,
+        "max_salary": 265000.0,
         "currency": "INR",
         "min_exp": 4.0,
         "max_exp": 8.0,
+        "work_mode": "HYBRID",
+        "job_type": "FULL_TIME",
         "skills": ["Python", "PyTorch", "NLP", "FastAPI", "Scikit-Learn", "Docker"],
-        "description": "Lead the development of recommendation systems and ATS resume scoring intelligence."
+        "description": "Lead the development of recommendation systems and ATS resume scoring intelligence.",
+        "applicant_count": 120,
+        "competition_level": "HIGH"
     },
     {
         "title": "Frontend Platform Engineer",
         "company": "FinFlow Payments",
         "company_rating": 4.2,
         "company_reviews": 85,
+        "company_about": "Modern financial technology stack powering seamless digital payments.",
+        "company_size": "100-500",
+        "company_industry": "Fintech",
+        "company_is_newly_founded": False,
         "location": "Pune, India",
-        "min_salary": 1400000.0,
-        "max_salary": 2000000.0,
+        "min_salary": 200000.0,
+        "max_salary": 240000.0,
         "currency": "INR",
         "min_exp": 2.0,
         "max_exp": 5.0,
+        "work_mode": "HYBRID",
+        "job_type": "FULL_TIME",
         "skills": ["React", "TypeScript", "Tailwind CSS", "Vite", "Framer Motion"],
-        "description": "Create responsive, accessible, animated interfaces for next-generation fintech experiences."
+        "description": "Create responsive, accessible, animated interfaces for next-generation fintech experiences.",
+        "applicant_count": 28,
+        "competition_level": "LOW"
     },
     {
         "title": "DevOps & Cloud Engineer",
         "company": "CloudMatrix Systems",
         "company_rating": 4.4,
         "company_reviews": 96,
+        "company_about": "Cloud infrastructure automation and enterprise reliability engineering.",
+        "company_size": "500+",
+        "company_industry": "Cloud Computing",
+        "company_is_newly_founded": False,
         "location": "Remote, India",
-        "min_salary": 1600000.0,
-        "max_salary": 2400000.0,
+        "min_salary": 210000.0,
+        "max_salary": 250000.0,
         "currency": "INR",
         "min_exp": 3.0,
         "max_exp": 6.0,
+        "work_mode": "REMOTE",
+        "job_type": "FULL_TIME",
         "skills": ["Docker", "Kubernetes", "AWS", "GitHub Actions", "PostgreSQL", "Linux"],
-        "description": "Deploy, monitor, and scale distributed microservices across containerized cloud environments."
+        "description": "Deploy, monitor, and scale distributed microservices across containerized cloud environments.",
+        "applicant_count": 65,
+        "competition_level": "MEDIUM"
     },
     {
         "title": "Junior Software Engineer",
         "company": "InnoSpark Studios",
         "company_rating": 4.0,
         "company_reviews": 42,
+        "company_about": "Creative software studio crafting engaging developer tools and applications.",
+        "company_size": "10-50",
+        "company_industry": "Software Development",
+        "company_is_newly_founded": True,
         "location": "Chennai, India",
-        "min_salary": 600000.0,
-        "max_salary": 900000.0,
+        "min_salary": 150000.0,
+        "max_salary": 200000.0,
         "currency": "INR",
         "min_exp": 0.0,
         "max_exp": 2.0,
+        "work_mode": "ONSITE",
+        "job_type": "FULL_TIME",
         "skills": ["Python", "SQL", "JavaScript", "Git"],
-        "description": "Entry-level software engineering opportunity with mentorship on distributed web architectures."
+        "description": "Entry-level software engineering opportunity with mentorship on distributed web architectures.",
+        "applicant_count": 15,
+        "competition_level": "LOW"
     }
 ]
 
@@ -119,26 +159,26 @@ def seed_database(db_url: str = None):
         # Insert company
         if db_type == "postgres":
             cur.execute("""
-                INSERT INTO companies (id, raw_company_id, name, aggregate_rating, reviews_count, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (company_id, 1001, item["company"], item["company_rating"], item["company_reviews"], now_iso, now_iso))
+                INSERT INTO companies (id, raw_company_id, name, aggregate_rating, reviews_count, about, size, industry, is_newly_founded, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (company_id, 1001, item["company"], item["company_rating"], item["company_reviews"], item["company_about"], item["company_size"], item["company_industry"], item["company_is_newly_founded"], now_iso, now_iso))
         else:
             cur.execute("""
-                INSERT INTO companies (id, raw_company_id, name, aggregate_rating, reviews_count, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (company_id, 1001, item["company"], item["company_rating"], item["company_reviews"], now_iso, now_iso))
+                INSERT INTO companies (id, raw_company_id, name, aggregate_rating, reviews_count, about, size, industry, is_newly_founded, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (company_id, 1001, item["company"], item["company_rating"], item["company_reviews"], item["company_about"], item["company_size"], item["company_industry"], item["company_is_newly_founded"], now_iso, now_iso))
 
         # Insert job
         if db_type == "postgres":
             cur.execute("""
-                INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, min_salary, max_salary, currency, min_experience, max_experience, location, posted_at_raw, posted_at_approx, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (job_id, 2001, company_id, item["title"], item["description"], item["min_salary"], item["max_salary"], item["currency"], item["min_exp"], item["max_exp"], item["location"], "Just Now", now_iso, now_iso, now_iso))
+                INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, min_salary, max_salary, currency, min_experience, max_experience, work_mode, job_type, location, applicant_count, competition_level, posted_at_raw, posted_at_approx, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (job_id, 2001, company_id, item["title"], item["description"], item["min_salary"], item["max_salary"], item["currency"], item["min_exp"], item["max_exp"], item.get("work_mode"), item.get("job_type"), item["location"], item["applicant_count"], item["competition_level"], "Just Now", now_iso, now_iso, now_iso))
         else:
             cur.execute("""
-                INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, min_salary, max_salary, currency, min_experience, max_experience, location, posted_at_raw, posted_at_approx, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (job_id, 2001, company_id, item["title"], item["description"], item["min_salary"], item["max_salary"], item["currency"], item["min_exp"], item["max_exp"], item["location"], "Just Now", now_iso, now_iso, now_iso))
+                INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, min_salary, max_salary, currency, min_experience, max_experience, work_mode, job_type, location, applicant_count, competition_level, posted_at_raw, posted_at_approx, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (job_id, 2001, company_id, item["title"], item["description"], item["min_salary"], item["max_salary"], item["currency"], item["min_exp"], item["max_exp"], item.get("work_mode"), item.get("job_type"), item["location"], item["applicant_count"], item["competition_level"], "Just Now", now_iso, now_iso, now_iso))
 
         # Insert skills & job_skills
         for skill_name in item["skills"]:

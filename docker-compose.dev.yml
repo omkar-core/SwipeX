@@ -64,6 +64,8 @@ services:
     restart: unless-stopped
     ports:
       - "8003:8003"
+    environment:
+      JOB_SERVICE_URL: http://job-data-service:8002
     networks:
       - swipex-network
 
@@ -81,6 +83,7 @@ services:
       SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-dev-session-secret-key-987654321}
       JOB_SERVICE_URL: http://job-data-service:8002
       RESUME_SERVICE_URL: http://resume-service:8003
+      MATCHING_ENGINE_URL: http://resume-service:8003
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:

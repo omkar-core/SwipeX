@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export type TabType = 
   | 'discover' 
+  | 'companies'
   | 'applications' 
   | 'messages' 
   | 'analytics' 
@@ -28,6 +29,7 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
 
   const candidateTabs: { id: TabType; label: string }[] = [
     { id: 'discover', label: 'Discover' },
+    { id: 'companies', label: 'Companies' },
     { id: 'applications', label: 'Applications' },
     { id: 'messages', label: 'Messages' },
     { id: 'analytics', label: 'Analytics' },

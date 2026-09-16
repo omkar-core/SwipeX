@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TopNav, TabType } from './TopNav';
 import { LeftSidebar } from './LeftSidebar';
 import { DiscoverScreen } from '../discover/DiscoverScreen';
+import { CompaniesScreen } from '../companies/CompaniesScreen';
 import { ApplicationsScreen } from '../applications/ApplicationsScreen';
 import { UploadResumeScreen } from '../resume/UploadResumeScreen';
 import { useAuth } from '../../context/AuthContext';
@@ -197,6 +198,7 @@ export const AppLayout: React.FC = () => {
             /* Candidate-Facing Views (Untouched) */
             <>
               {activeTab === 'discover' && <DiscoverScreen />}
+              {activeTab === 'companies' && <CompaniesScreen />}
               {activeTab === 'applications' && (
                 <ApplicationsScreen onNavigateToResume={() => setActiveTab('resume')} />
               )}

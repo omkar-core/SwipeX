@@ -1,6 +1,8 @@
 """
 FastAPI Router for Job Endpoints.
-Implements GET /api/v1/jobs and GET /api/v1/jobs/{job_id} per SRS Section 7.2 contract.
+Implements GET /api/v1/jobs, GET /api/v1/jobs/search, and GET /api/v1/jobs/{job_id}
+per SRS Section 7.2 contract. /search is registered BEFORE /{job_id} to prevent
+the literal string 'search' from being captured by the UUID path parameter.
 """
 import uuid
 from typing import List, Optional
@@ -51,6 +53,7 @@ def list_jobs(
     salary_min: Optional[float] = Query(None, ge=0, description="Minimum salary boundary"),
     salary_max: Optional[float] = Query(None, ge=0, description="Maximum salary boundary"),
     skills: Optional[str] = Query(None, description="Comma-separated skill names"),
+    q: Optional[str] = Query(None, description="Keyword search: title, description, or skills"),
     optional_user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
     db_ctx=Depends(get_db_conn)
 ):
@@ -92,22 +95,23 @@ def list_jobs(
         if swiped_set:
             exclude_ids = list(swiped_set)
 
-    # 2. Check Job Feed Result Cache
-    cache_key = RedisCacheService.build_feed_cache_key(
-        user_id=user_id,
-        page=page,
-        page_size=page_size,
-        company_type=type,
-        location=location,
-        remote=remote,
-        salary_min=salary_min,
-        salary_max=salary_max,
-        skills=skills_list
-    )
-
-    cached_results = cache_service.get_job_feed(cache_key)
-    if cached_results is not None:
-        return cached_results
+    # 2. Check Job Feed Result Cache (only for unsearched feed)
+    cache_key = None
+    if not q:
+        cache_key = RedisCacheService.build_feed_cache_key(
+            user_id=user_id,
+            page=page,
+            page_size=page_size,
+            company_type=type,
+            location=location,
+            remote=remote,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            skills=skills_list
+        )
+        cached_results = cache_service.get_job_feed(cache_key)
+        if cached_results is not None:
+            return cached_results
 
     # 3. Query PostgreSQL Database (Source of truth)
     repo = JobRepository(conn, db_type)
@@ -120,12 +124,89 @@ def list_jobs(
         salary_min=salary_min,
         salary_max=salary_max,
         skills_param=skills_list,
-        exclude_job_ids=exclude_ids
+        exclude_job_ids=exclude_ids,
+        keyword_param=q
     )
 
-    # 4. Cache query results in Redis
-    cache_service.set_job_feed(cache_key, results)
+    # 4. Cache query results in Redis (only for unsearched feed)
+    if cache_key:
+        cache_service.set_job_feed(cache_key, results)
 
+    return results
+
+
+@router.get(
+    "/search",
+    response_model=List[JobSummarySchema],
+    status_code=status.HTTP_200_OK,
+    summary="Keyword search across job titles, descriptions, and skills",
+    description="""
+Searches jobs by keyword (title/description/skills substring) plus all standard filters.
+Registered BEFORE /{job_id} so the literal path segment 'search' is not
+mistaken for a job UUID.
+
+Supported Filters:
+- **q**: Keyword substring match against title, job description, and skills (case-insensitive)
+- **location**: Location name (case-insensitive partial substring match)
+- **remote**: Comma-separated work modes: Remote,Hybrid,On-site
+- **salary_min / salary_max**: Salary range overlap filter
+- **skills**: Comma-separated list of skills (case-insensitive OR / match-any semantics)
+    """
+)
+def search_jobs(
+    q: Optional[str] = Query(None, description="Keyword search: title, description, or skills"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(20, ge=1, le=100, description="Page size limit (1 to 100)"),
+    location: Optional[str] = Query(None, description="Location substring filter"),
+    remote: Optional[str] = Query(None, description="Comma-separated work modes: Remote,Hybrid,On-site"),
+    salary_min: Optional[float] = Query(None, ge=0, description="Minimum salary boundary"),
+    salary_max: Optional[float] = Query(None, ge=0, description="Maximum salary boundary"),
+    skills: Optional[str] = Query(None, description="Comma-separated skill names"),
+    optional_user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+    db_ctx=Depends(get_db_conn)
+):
+    conn, db_type = db_ctx
+
+    if salary_min is not None and salary_max is not None:
+        if salary_min > salary_max:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="salary_min cannot be greater than salary_max"
+            )
+
+    skills_list: Optional[List[str]] = None
+    if skills and skills.strip():
+        skills_list = [s.strip() for s in skills.split(",") if s.strip()]
+
+    work_modes: Optional[List[str]] = None
+    if remote and remote.strip():
+        work_modes = [m.strip().upper().replace("-", "") for m in remote.split(",") if m.strip()]
+
+    user_id: Optional[str] = None
+    exclude_ids: Optional[List[str]] = None
+    if optional_user and optional_user.role in ("Job Seeker", "job_seeker"):
+        user_id = optional_user.user_id
+        cache_service = get_cache_service()
+        swiped_set = cache_service.get_swiped_job_ids(user_id)
+        if swiped_set is None:
+            swipe_repo = SwipeRepository(conn, db_type)
+            swiped_set = swipe_repo.get_user_swiped_job_ids(user_id)
+            cache_service.set_swiped_job_ids(user_id, swiped_set)
+        if swiped_set:
+            exclude_ids = list(swiped_set)
+
+    repo = JobRepository(conn, db_type)
+    results = repo.list_jobs(
+        page=page,
+        page_size=page_size,
+        location_param=location,
+        work_mode_param=work_modes,
+        salary_min=salary_min,
+        salary_max=salary_max,
+        skills_param=skills_list,
+        exclude_job_ids=exclude_ids,
+        keyword_param=q
+    )
     return results
 
 

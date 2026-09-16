@@ -55,9 +55,16 @@ def test_resume_upload_ats_score_and_recommendations(gateway_url, test_job_seeke
     assert "ats_score" in ats_data or "match_score" in ats_data
     assert ats_data.get("generated_by") == "heuristic-v0"
 
-    # 4. Fetch job recommendations via Gateway
+    # 4. Fetch job recommendations via Gateway.
+    #    The Matching Engine keys recommendations off the caller: pass user_id
+    #    (the engine's contract) as a query param; nothing may be omitted.
+    me_res = httpx.get(f"{gateway_url}/api/v1/auth/me", headers=headers, timeout=5.0)
+    assert me_res.status_code == 200, f"/auth/me failed: {me_res.status_code} - {me_res.text}"
+    user_id = me_res.json()["user_id"]
+
     recs_res = httpx.get(
         f"{gateway_url}/api/v1/recommendations",
+        params={"user_id": user_id},
         headers=headers,
         timeout=5.0
     )

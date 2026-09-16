@@ -27,9 +27,10 @@ import {
   PipelineStage,
   RecruiterAnalyticsData,
   CandidateAnalyticsData
-  , AdminDashboardData, AdminUserRecord, AdminRecruiterRecord, AdminJobRecord, AdminApplicationRecord, AdminAnalyticsData
+  , AdminDashboardData, AdminUserRecord, AdminRecruiterRecord, AdminJobRecord, AdminApplicationRecord, AdminAnalyticsData,
+  Company, CompanyDetail
 } from '../types';
-import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME } from '../data/mockData';
+import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME, MOCK_COMPANIES } from '../data/mockData';
 
 
 // Realistic network latency simulation helper for mock mode
@@ -308,7 +309,7 @@ export class ApiService {
      ========================================================================== */
 
   /**
-   * GET /api/v1/jobs?type=&location=&remote=&salary_min=&salary_max=&skills=&industry=
+   * GET /api/v1/jobs?type=&location=&remote=&salary_min=&salary_max=&skills=&industry=&q=
    * Queries job listings with filter parameters.
    */
   static async getJobs(params?: {
@@ -319,6 +320,7 @@ export class ApiService {
     salary_max?: number;
     skills?: string;
     industry?: string;
+    q?: string;
   }): Promise<Job[]> {
     if (!API_CONFIG.USE_MOCK) {
       const query = new URLSearchParams();
@@ -330,6 +332,7 @@ export class ApiService {
         if (params.salary_max) query.append('salary_max', params.salary_max.toString());
         if (params.skills) query.append('skills', params.skills);
         if (params.industry) query.append('industry', params.industry);
+        if (params.q) query.append('q', params.q);
       }
       const queryString = query.toString();
       const endpoint = `${API_ENDPOINTS.JOBS.LIST}${queryString ? `?${queryString}` : ''}`;
@@ -341,6 +344,15 @@ export class ApiService {
     let jobs = [...MOCK_JOBS];
 
     if (params) {
+      if (params.q && params.q.trim()) {
+        const queryTerm = params.q.toLowerCase().trim();
+        jobs = jobs.filter(j => 
+          (j.title || '').toLowerCase().includes(queryTerm) ||
+          (j.company || '').toLowerCase().includes(queryTerm) ||
+          (j.description || '').toLowerCase().includes(queryTerm) ||
+          (j.skills_required || j.skills || []).some(s => s.toLowerCase().includes(queryTerm))
+        );
+      }
       if (params.industry && params.industry !== 'All') {
         jobs = jobs.filter(j => 
           (j.industry || '').toLowerCase().includes(params.industry!.toLowerCase())
@@ -384,6 +396,55 @@ export class ApiService {
       throw new ApiError(`Job not found: ${jobId}`, 404);
     }
     return found;
+  }
+
+  /**
+   * GET /api/v1/companies
+   * Retrieves paginated companies with optional newly_founded and industry filters.
+   */
+  static async getCompanies(params?: {
+    newly_founded?: boolean;
+    industry?: string;
+    type?: string;
+  }): Promise<Company[]> {
+    if (!API_CONFIG.USE_MOCK) {
+      const query = new URLSearchParams();
+      if (params) {
+        if (params.newly_founded !== undefined) query.append('newly_founded', String(params.newly_founded));
+        if (params.industry) query.append('industry', params.industry);
+        if (params.type) query.append('type', params.type);
+      }
+      const qs = query.toString();
+      return httpRequest<Company[]>(`${API_ENDPOINTS.COMPANIES.LIST}${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    }
+
+    await mockDelay(150);
+    let list = [...MOCK_COMPANIES];
+    if (params?.newly_founded !== undefined) {
+      list = list.filter(c => c.is_newly_founded === params.newly_founded);
+    }
+    if (params?.industry) {
+      list = list.filter(c => (c.industry || '').toLowerCase().includes(params.industry!.toLowerCase()));
+    }
+    return list;
+  }
+
+  /**
+   * GET /api/v1/companies/{company_id}
+   * Retrieves detailed company profile with active jobs.
+   */
+  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<CompanyDetail>(API_ENDPOINTS.COMPANIES.DETAIL(companyId), { method: 'GET' });
+    }
+
+    await mockDelay(120);
+    const company = MOCK_COMPANIES.find(c => c.id === companyId) || MOCK_COMPANIES[0];
+    const relatedJobs = MOCK_JOBS.filter(j => (j.company || '').toLowerCase() === company.name.toLowerCase());
+    return {
+      ...company,
+      jobs: relatedJobs
+    };
   }
 
   /**

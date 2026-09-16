@@ -60,3 +60,49 @@ def test_job_seeker_allowed_to_swipe(gateway_url, test_job_seeker):
         timeout=5.0
     )
     assert res.status_code == 201, f"Expected 201 Created for job_seeker swipe, got {res.status_code}"
+
+
+def test_recruiter_allowed_to_create_job(gateway_url, test_recruiter):
+    """M2-RBAC-005: Verifies that a Recruiter can access POST /api/v1/jobs."""
+    payload = {
+        "title": "Staff Backend Engineer",
+        "description": "Lead architecture for distributed systems.",
+        "location": "Bangalore",
+        "salary_min": 2500000,
+        "salary_max": 4000000,
+        "skills": ["Python", "FastAPI", "PostgreSQL"]
+    }
+    res = httpx.post(
+        f"{gateway_url}/api/v1/jobs",
+        json=payload,
+        headers=test_recruiter["headers"],
+        timeout=5.0
+    )
+    # The gateway forwards to Job service (which returns 200/201 or 503 if downstream not running)
+    assert res.status_code in (200, 201, 503), f"Unexpected status {res.status_code}: {res.text}"
+
+
+def test_job_seeker_blocked_from_creating_job(gateway_url, test_job_seeker):
+    """M2-RBAC-006: Verifies that a Job Seeker is forbidden (403) from creating jobs."""
+    payload = {
+        "title": "Unauthorized Job",
+        "description": "Should be blocked.",
+        "location": "Remote"
+    }
+    res = httpx.post(
+        f"{gateway_url}/api/v1/jobs",
+        json=payload,
+        headers=test_job_seeker["headers"],
+        timeout=5.0
+    )
+    assert res.status_code == 403, f"Expected 403 Forbidden for job seeker posting job, got {res.status_code}"
+
+
+def test_public_browsing_without_token(gateway_url, check_gateway_health):
+    """M2-RBAC-007: Verifies that public browsing on /jobs and /companies requires no token."""
+    res_jobs = httpx.get(f"{gateway_url}/api/v1/jobs?page=1&page_size=2", timeout=5.0)
+    assert res_jobs.status_code == 200, f"Public jobs browsing failed: {res_jobs.status_code}"
+
+    res_companies = httpx.get(f"{gateway_url}/api/v1/companies", timeout=5.0)
+    assert res_companies.status_code in (200, 503), f"Public companies browsing failed: {res_companies.status_code}"
+

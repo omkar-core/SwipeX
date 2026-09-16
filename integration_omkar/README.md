@@ -1,6 +1,6 @@
 # SwipeX — Integration & Development Workspace (`integration_omkar`)
 
-> **Milestone 1 — Platform, Testing & Multi-Service Integration**  
+> **Milestone 2 — Platform, Testing & Multi-Service Integration**  
 > **Team**: Team-4  
 > **Role Owner**: Integration & Development Engineer (`integration_omkar`)  
 > **Branch**: `Team-4`
@@ -188,3 +188,54 @@ The GitHub Actions workflow is defined in [`.github/workflows/ci.yml`](../.githu
 1. **Heuristic v0 AI/ATS**: As specified in the Milestone 1 SRS, the Resume and Recommendation endpoints use deterministic skill/keyword overlap matching (`"generated_by": "heuristic-v0"`). Neural embeddings and ML models are scheduled for Milestone 2 & 3.
 2. **Google OAuth2**: Requires valid Google Cloud credentials in `.env` (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`). Email/password registration and login function 100% locally without external dependencies.
 3. **Dataset 1 Scope**: In `data_hanith`, raw dataset fields `work_mode`, `job_type`, and `company_type` are NULL in the source Excel file, so filtering strictly by `remote=true` on raw Dataset 1 returns zero results.
+
+---
+
+# Milestone 2 — Swipe System, Job Discovery & Integration
+
+## 1. M2 Overview
+Milestone 2 establishes full cross-service integration for the Swipe System, Public & Authenticated Job Discovery, Multi-Dimensional Search & Filtering, and Heuristic Matching Engine Recommendations.
+
+## 2. M2 Architecture & Services
+
+| Service Container | Directory | Internal Port | External Port | Functionality |
+|---|---|---|---|---|
+| `swipex-auth-gateway` | `backend_mansi` | 8001 | `8001` | Auth, Identity, Token issuance, RBAC & Gateway proxying |
+| `swipex-job-data` | `data_hanith` | 8002 | `8002` | Job listings, company data, swipes, feed exclusion & Redis cache |
+| `swipex-resume-service` | `aiml_hemalatha` | 8003 | `8003` | ATS resume parsing & heuristic recommendation matching engine |
+| `swipex-frontend` | `frontend_boomika` | 3000 | `3000` | React 18 + Vite swipe deck UI & candidate dashboard |
+| `swipex-postgres` | PostgreSQL 15 | 5432 | `5432` | Relational storage (`swipex_auth` and `swipex_job`) |
+| `swipex-redis` | Redis 7 | 6379 | `6379` | User swipe caching & feed result acceleration |
+
+## 3. M2 Test Execution Runbook
+
+### Run all M2 Automated Integration Tests:
+```bash
+pytest integration_omkar/tests/ -v --tb=short
+```
+
+### Run Service Unit Test Suites:
+```bash
+pytest backend_mansi/tests/ -v
+pytest aiml_hemalatha/tests/ -v
+```
+
+### Build Frontend Application:
+```bash
+cd frontend_boomika && npm run build
+```
+
+## 4. Milestone 2 Deliverables & Reports
+- [M2 Test Plan](m2_test_plan.md)
+- [M2 Test Cases](m2_test_cases.md)
+- [M2 Integration Report](m2_integration_report.md)
+- [M2 Regression Report](m2_regression_report.md)
+- [M2 Code Quality Report](m2_code_quality_report.md)
+- [M2 QA Sign-off](m2_qa_signoff.md)
+- [M2 Final Audit](m2_final_audit.md)
+- [M2 Mentor Demo Checklist](m2_demo_checklist.md)
+- [Integration Defect Log](defect_log.md)
+
+## 5. Deployment Boundary
+Milestone 2 strictly maintains local container orchestration and CI automation. No production cloud deployment or packaging is introduced.
+

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ChevronDown, Check, RotateCcw } from 'lucide-react';
+import { ChevronDown, Check, RotateCcw, Search, Sparkles, Loader2 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { useJobs } from '../../context/JobContext';
 import { useAuth } from '../../context/AuthContext';
@@ -25,7 +25,32 @@ export const DiscoverScreen: React.FC = () => {
     toggleWorkEnvironment,
     setIndustry,
     setSalaryRange,
+    setSearchQuery,
   } = useJobs();
+
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+
+  useEffect(() => {
+    const loadRecs = async () => {
+      if (!user?.user_id) return;
+      setLoadingRecs(true);
+      try {
+        const res = await ApiService.getRecommendations(user.user_id);
+        if (res && Array.isArray(res)) {
+          setRecommendations(res);
+        } else if (res && (res as any).recommendations) {
+          setRecommendations((res as any).recommendations);
+        }
+      } catch (err) {
+        console.warn("Recommendations fetch:", err);
+      } finally {
+        setLoadingRecs(false);
+      }
+    };
+    loadRecs();
+  }, [user?.user_id]);
 
   // ── Feature 2: Skill Gap Drawer state ─────────────────────────────────────
   const [skillGapJob, setSkillGapJob] = useState<Job | null>(null);
@@ -130,6 +155,28 @@ export const DiscoverScreen: React.FC = () => {
             <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
               Discovery Filters
             </h2>
+
+            {/* Keyword Search */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Keyword Search
+              </label>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="e.g. Python, Full Stack, Remote..."
+                  defaultValue={filters.searchQuery || ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery((e.target as HTMLInputElement).value);
+                    }
+                  }}
+                  onBlur={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-700/60 rounded-lg text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
 
             {/* Industry Dropdown */}
             <div>
@@ -342,6 +389,54 @@ export const DiscoverScreen: React.FC = () => {
                     {tool}
                   </span>
                 ))}
+              </div>
+            </div>
+
+            {/* Top AI Recommendations */}
+            <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  AI Recommended Roles
+                </h4>
+                {loadingRecs && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+              </div>
+              <div className="space-y-2">
+                {recommendations.length === 0 && !loadingRecs ? (
+                  <p className="text-[11px] text-slate-400 italic">Upload a resume to unlock personalized role recommendations.</p>
+                ) : (
+                  recommendations.slice(0, 4).map((rec: any, idx) => (
+                    <div
+                      key={idx}
+                      onClick={async () => {
+                        try {
+                          const j = await ApiService.getJobById(String(rec.job_id));
+                          if (j) {
+                            setDetailJob(j);
+                            setIsDetailOpen(true);
+                          }
+                        } catch (e) {
+                          console.warn("Could not fetch recommended job details", e);
+                        }
+                      }}
+                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-200/60 dark:border-slate-700/60 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                          {rec.title || `Role #${rec.job_id}`}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-950 px-1.5 py-0.5 rounded">
+                          {rec.match_score ?? rec.match_percentage ?? 88}% Match
+                        </span>
+                      </div>
+                      {rec.required_skills && (
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 truncate">
+                          Skills: {Array.isArray(rec.required_skills) ? rec.required_skills.slice(0, 3).join(', ') : rec.required_skills}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

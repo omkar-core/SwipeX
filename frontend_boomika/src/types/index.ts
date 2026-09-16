@@ -173,6 +173,7 @@ export interface FilterState {
   salaryMin: number;
   salaryMax: number;
   workEnvironments: ('Remote' | 'Hybrid' | 'On-site')[];
+  searchQuery?: string;
 }
 
 export interface TimelineItem {
@@ -337,6 +338,23 @@ export interface CandidateAnalyticsData {
   top_industries: CandidateIndustryEngagementItem[];
   activity_heatmap: CandidateActivityDayItem[];
   generated_at?: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  company_type?: string;
+  aggregate_rating?: number;
+  reviews_count?: number;
+  about?: string;
+  size?: string;
+  industry?: string;
+  is_newly_founded: boolean;
+  jobs_count?: number;
+}
+
+export interface CompanyDetail extends Company {
+  jobs: Job[];
 }
 
 

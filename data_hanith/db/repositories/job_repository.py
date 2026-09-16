@@ -54,7 +54,8 @@ class JobRepository:
         salary_min: Optional[float] = None,
         salary_max: Optional[float] = None,
         skills_param: Optional[List[str]] = None,
-        exclude_job_ids: Optional[List[str]] = None
+        exclude_job_ids: Optional[List[str]] = None,
+        keyword_param: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         cursor = get_dict_cursor(self.conn, self.db_type)
 
@@ -118,6 +119,34 @@ class JobRepository:
                 """
                 where_clauses.append(subquery)
                 params.extend(clean_skills)
+
+        # 7. Keyword Search Filter (Match against title, job_description, or skills)
+        if keyword_param and keyword_param.strip():
+            clean_kw = f"%{keyword_param.strip()}%"
+            if self.db_type == "postgres":
+                kw_subquery = f"""(
+                    j.title ILIKE {param_placeholder}
+                    OR j.job_description ILIKE {param_placeholder}
+                    OR j.id IN (
+                        SELECT js.job_id
+                        FROM job_skills js
+                        JOIN skills s ON js.skill_id = s.id
+                        WHERE s.name ILIKE {param_placeholder}
+                    )
+                )"""
+            else:
+                kw_subquery = f"""(
+                    LOWER(j.title) LIKE LOWER({param_placeholder})
+                    OR LOWER(j.job_description) LIKE LOWER({param_placeholder})
+                    OR j.id IN (
+                        SELECT js.job_id
+                        FROM job_skills js
+                        JOIN skills s ON js.skill_id = s.id
+                        WHERE LOWER(s.name) LIKE LOWER({param_placeholder})
+                    )
+                )"""
+            where_clauses.append(kw_subquery)
+            params.extend([clean_kw, clean_kw, clean_kw])
 
         where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
         offset = (page - 1) * page_size

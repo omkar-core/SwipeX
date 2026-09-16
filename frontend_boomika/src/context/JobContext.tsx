@@ -23,6 +23,7 @@ interface JobContextType {
   toggleWorkEnvironment: (env: 'Remote' | 'Hybrid' | 'On-site') => void;
   setIndustry: (industry: string) => void;
   setSalaryRange: (min: number, max: number) => void;
+  setSearchQuery: (query: string) => void;
   refetchJobs: () => Promise<void>;
 }
 
@@ -55,6 +56,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         salary_min: filters.salaryMin,
         salary_max: filters.salaryMax,
         remote: filters.workEnvironments.join(','),
+        q: filters.searchQuery || undefined,
       });
       setJobs(fetched);
       setAllJobs(fetched);
@@ -160,6 +162,10 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFilters(prev => ({ ...prev, salaryMin, salaryMax }));
   }, []);
 
+  const setSearchQuery = useCallback((query: string) => {
+    setFilters(prev => ({ ...prev, searchQuery: query }));
+  }, []);
+
   return (
     <JobContext.Provider
       value={{
@@ -180,6 +186,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleWorkEnvironment,
         setIndustry,
         setSalaryRange,
+        setSearchQuery,
         refetchJobs: fetchJobs,
       }}
     >

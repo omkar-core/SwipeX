@@ -1,10 +1,10 @@
-import { Job, User, TimelineItem, RecommendedAction, SavedJob, ResumeData, Company } from '../types';
+import { Job, User, TimelineItem, RecommendedAction, SavedJob, ResumeData } from '../types';
 
 export const INITIAL_USER: User = {
   user_id: 'usr_8829a1b',
   name: 'Alex Mercer',
   email: 'alex.mercer@design.co',
-  role: 'job_seeker',
+  role: 'candidate',
   title: 'Senior Product Designer',
   tier: 'Tier 1 Talent',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -814,76 +814,13 @@ export const MOCK_SAVED_JOBS: SavedJob[] = [
 ];
 
 export const MOCK_INITIAL_RESUME: ResumeData = {
-  resume_id: '',
-  filename: '',
-  file_size: '',
-  uploaded_at: '',
-  parsed_skills: [],
-  overall_fit_score: 0,
-  format_compatibility: 'Low',
-  status: 'error',
-  progress: 0
+  resume_id: 'res_2024_johndoe',
+  filename: 'johndoe_resume_2024.pdf',
+  file_size: '1.8 MB',
+  uploaded_at: '2024-10-25T10:30:00Z',
+  parsed_skills: ['Figma', 'Design Systems', 'UI/UX Prototyping', 'Wireframing', 'User Research', 'React', 'Accessibility (WCAG)', 'TypeScript', 'Tailwind CSS', 'Micro-interactions'],
+  overall_fit_score: 88,
+  format_compatibility: 'High',
+  status: 'parsed',
+  progress: 100
 };
-
-export const MOCK_COMPANIES: Company[] = [
-  {
-    id: 'comp_001',
-    name: 'Nexus Technologies',
-    company_type: 'Enterprise Tech',
-    aggregate_rating: 4.5,
-    reviews_count: 128,
-    about: 'Leading provider of scalable web solutions and enterprise cloud platforms.',
-    size: '50-200',
-    industry: 'Information Technology',
-    is_newly_founded: false,
-    jobs_count: 3
-  },
-  {
-    id: 'comp_002',
-    name: 'HyperScale AI Labs',
-    company_type: 'Startup',
-    aggregate_rating: 4.8,
-    reviews_count: 310,
-    about: 'Pioneering artificial intelligence and deep learning models for next-gen automation.',
-    size: '20-50',
-    industry: 'Artificial Intelligence',
-    is_newly_founded: true,
-    jobs_count: 2
-  },
-  {
-    id: 'comp_003',
-    name: 'FinFlow Payments',
-    company_type: 'Fintech',
-    aggregate_rating: 4.2,
-    reviews_count: 85,
-    about: 'Modern financial technology stack powering seamless digital payments.',
-    size: '100-500',
-    industry: 'Fintech',
-    is_newly_founded: false,
-    jobs_count: 2
-  },
-  {
-    id: 'comp_004',
-    name: 'CloudMatrix Systems',
-    company_type: 'Cloud Computing',
-    aggregate_rating: 4.4,
-    reviews_count: 96,
-    about: 'Cloud infrastructure automation and enterprise reliability engineering.',
-    size: '500+',
-    industry: 'Cloud Computing',
-    is_newly_founded: false,
-    jobs_count: 1
-  },
-  {
-    id: 'comp_005',
-    name: 'InnoSpark Studios',
-    company_type: 'Startup',
-    aggregate_rating: 4.0,
-    reviews_count: 42,
-    about: 'Creative software studio crafting engaging developer tools and applications.',
-    size: '10-50',
-    industry: 'Software Development',
-    is_newly_founded: true,
-    jobs_count: 1
-  }
-];

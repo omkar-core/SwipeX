@@ -1,57 +1,4 @@
-export type UserRole = 'job_seeker' | 'recruiter' | 'admin';
-
-export interface AdminDashboardData {
-  total_users: number;
-  total_recruiters: number;
-  total_job_seekers: number;
-  total_jobs: number;
-  active_jobs: number;
-  total_applications: number;
-  pending_items: number;
-}
-
-export interface AdminUserRecord {
-  user_id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  status: string;
-  created_at?: string;
-  company_name?: string;
-}
-
-export interface AdminRecruiterRecord extends AdminUserRecord {
-  designation?: string;
-  job_count: number;
-}
-
-export interface AdminJobRecord {
-  job_id: string;
-  title: string;
-  company: string;
-  location: string;
-  status: JobStatus;
-  recruiter_id?: string;
-  posted_at?: string;
-  application_count: number;
-}
-
-export interface AdminApplicationRecord {
-  application_id: string;
-  candidate_name: string;
-  candidate_email: string;
-  job_title: string;
-  company: string;
-  recruiter_id?: string;
-  stage: string;
-  applied_at?: string;
-}
-
-export interface AdminAnalyticsData {
-  user_types: Record<string, number>;
-  job_status: Record<string, number>;
-  application_stages: Record<string, number>;
-}
+export type UserRole = 'candidate' | 'recruiter' | 'admin';
 
 export interface User {
   user_id: string;
@@ -157,6 +104,12 @@ export interface Job {
   salary_max?: number;
   tags?: string[];
   match_badges?: string[];
+  // Milestone 2 Schema Additions
+  applicant_count?: number;
+  competition_level?: 'low' | 'medium' | 'high';
+  company_type?: 'MNC' | 'High-Growth Startup' | 'Seed-Stage';
+  experience_level?: 'Entry / Fresher' | 'Mid Level' | 'Senior' | 'Lead / Director';
+  is_fresher_friendly?: boolean;
 }
 
 export type SwipeDirection = 'left' | 'right' | 'up'; // left = pass, right = save / match
@@ -173,7 +126,6 @@ export interface FilterState {
   salaryMin: number;
   salaryMax: number;
   workEnvironments: ('Remote' | 'Hybrid' | 'On-site')[];
-  searchQuery?: string;
 }
 
 export interface TimelineItem {
@@ -338,23 +290,6 @@ export interface CandidateAnalyticsData {
   top_industries: CandidateIndustryEngagementItem[];
   activity_heatmap: CandidateActivityDayItem[];
   generated_at?: string;
-}
-
-export interface Company {
-  id: string;
-  name: string;
-  company_type?: string;
-  aggregate_rating?: number;
-  reviews_count?: number;
-  about?: string;
-  size?: string;
-  industry?: string;
-  is_newly_founded: boolean;
-  jobs_count?: number;
-}
-
-export interface CompanyDetail extends Company {
-  jobs: Job[];
 }
 
 

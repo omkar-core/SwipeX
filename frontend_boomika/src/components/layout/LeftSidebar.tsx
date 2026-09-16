@@ -45,27 +45,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
     { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
   ];
 
-  const adminNavItems = [
-    { id: 'recruiter-dashboard' as TabType, label: 'Platform Dashboard', icon: LayoutDashboard },
-    { id: 'recruiter-jobs' as TabType, label: 'Job Listings', icon: Briefcase },
-    { id: 'analytics' as TabType, label: 'System Analytics', icon: BarChart2 },
-    { id: 'profile' as TabType, label: 'Admin Profile', icon: ShieldCheck },
-  ];
-
-  const navItems = currentRole === 'admin'
-    ? adminNavItems
-    : currentRole === 'recruiter'
-      ? recruiterNavItems
-      : candidateNavItems;
+  const navItems = currentRole === 'recruiter' ? recruiterNavItems : candidateNavItems;
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as UserRole;
     switchRole(newRole);
     if (newRole === 'recruiter') {
       onTabChange('recruiter-dashboard');
-    } else if (newRole === 'admin') {
-      onTabChange('recruiter-dashboard');
-    } else if (newRole === 'job_seeker') {
+    } else if (newRole === 'candidate') {
       onTabChange('discover');
     }
     showToast(`Switched active workspace view to ${newRole.toUpperCase()}`, 'info');
@@ -116,7 +103,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
                 onChange={handleRoleChange}
                 className="w-full bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-subtle"
               >
-                <option value="job_seeker">Candidate (Job Seeker)</option>
+                <option value="candidate">Candidate (Job Seeker)</option>
                 <option value="recruiter">Recruiter (Talent Partner)</option>
                 <option value="admin">Platform Admin</option>
               </select>

@@ -10,7 +10,7 @@
 
 export const API_CONFIG = {
   // Base URL for real backend REST endpoints
-  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8001/api/v1',
+  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8000/api/v1',
   
   // Flag to toggle between real fetch calls and isolated mock fallback
   // Default is true when VITE_USE_MOCK is 'true' or not specified in dev
@@ -41,12 +41,7 @@ export const API_ENDPOINTS = {
   },
   JOBS: {
     LIST: '/jobs',
-    SEARCH: '/jobs/search',
     DETAIL: (jobId: string) => `/jobs/${jobId}`,
-  },
-  COMPANIES: {
-    LIST: '/companies',
-    DETAIL: (companyId: string) => `/companies/${companyId}`,
   },
   SWIPES: {
     SUBMIT: '/swipes',
@@ -58,7 +53,7 @@ export const API_ENDPOINTS = {
     RECOMMENDATIONS: '/recommendations',
   },
   PROFILE: {
-    ME: '/auth/me',
+    ME: '/profile/me',
     UPDATE: '/profile/me',
     UPLOAD_PICTURE: '/profile/upload-picture',
   },
@@ -71,14 +66,6 @@ export const API_ENDPOINTS = {
   },
   ANALYTICS: {
     CANDIDATE_SUMMARY: '/analytics/candidate-summary',
-  },
-  ADMIN: {
-    DASHBOARD: '/admin/dashboard',
-    USERS: '/admin/users',
-    RECRUITERS: '/admin/recruiters',
-    JOBS: '/admin/jobs',
-    APPLICATIONS: '/admin/applications',
-    ANALYTICS: '/admin/analytics',
   }
 };
 

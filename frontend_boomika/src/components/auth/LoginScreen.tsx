@@ -17,7 +17,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
   const [maintainSession, setMaintainSession] = useState(true);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [name, setName] = useState('Alex Mercer');
-  const [role, setRole] = useState<UserRole>('job_seeker');
+  const [role, setRole] = useState<UserRole>('candidate');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +125,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: 'job_seeker' as UserRole, label: 'Candidate', icon: UserCheck },
+                      { id: 'candidate' as UserRole, label: 'Candidate', icon: UserCheck },
                       { id: 'recruiter' as UserRole, label: 'Recruiter', icon: Briefcase },
                       { id: 'admin' as UserRole, label: 'Admin', icon: Shield },
                     ].map((r) => {

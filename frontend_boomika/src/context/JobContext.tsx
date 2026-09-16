@@ -3,7 +3,6 @@ import { Job, FilterState, SavedJob, TimelineItem, RecommendedAction } from '../
 import { ApiService } from '../services/api';
 import { MOCK_JOBS, MOCK_TIMELINE, MOCK_RECOMMENDED_ACTIONS, MOCK_SAVED_JOBS } from '../data/mockData';
 import { useToast } from './ToastContext';
-import { useAuth } from './AuthContext';
 
 interface JobContextType {
   jobs: Job[];
@@ -23,7 +22,6 @@ interface JobContextType {
   toggleWorkEnvironment: (env: 'Remote' | 'Hybrid' | 'On-site') => void;
   setIndustry: (industry: string) => void;
   setSalaryRange: (min: number, max: number) => void;
-  setSearchQuery: (query: string) => void;
   refetchJobs: () => Promise<void>;
 }
 
@@ -31,7 +29,6 @@ const JobContext = createContext<JobContextType | undefined>(undefined);
 
 export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast } = useToast();
-  const { isAuthenticated } = useAuth();
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [allJobs, setAllJobs] = useState<Job[]>(MOCK_JOBS);
   const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(false);
@@ -56,7 +53,6 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         salary_min: filters.salaryMin,
         salary_max: filters.salaryMax,
         remote: filters.workEnvironments.join(','),
-        q: filters.searchQuery || undefined,
       });
       setJobs(fetched);
       setAllJobs(fetched);
@@ -69,9 +65,8 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [filters, showToast]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     fetchJobs();
-  }, [isAuthenticated, fetchJobs]);
+  }, [fetchJobs]);
 
   const currentJob = jobs[currentIndex] || null;
 
@@ -162,10 +157,6 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFilters(prev => ({ ...prev, salaryMin, salaryMax }));
   }, []);
 
-  const setSearchQuery = useCallback((query: string) => {
-    setFilters(prev => ({ ...prev, searchQuery: query }));
-  }, []);
-
   return (
     <JobContext.Provider
       value={{
@@ -186,7 +177,6 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleWorkEnvironment,
         setIndustry,
         setSalaryRange,
-        setSearchQuery,
         refetchJobs: fetchJobs,
       }}
     >

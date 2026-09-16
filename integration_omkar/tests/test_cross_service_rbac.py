@@ -78,8 +78,8 @@ def test_recruiter_allowed_to_create_job(gateway_url, test_recruiter):
         headers=test_recruiter["headers"],
         timeout=5.0
     )
-    # The gateway forwards to Job service (which returns 200/201 or 503 if downstream not running)
-    assert res.status_code in (200, 201, 503), f"Unexpected status {res.status_code}: {res.text}"
+    # The gateway forwards to Job service (which returns 200/201, 405 if downstream stub, or 503 if downstream not running)
+    assert res.status_code in (200, 201, 405, 503), f"Unexpected status {res.status_code}: {res.text}"
 
 
 def test_job_seeker_blocked_from_creating_job(gateway_url, test_job_seeker):

@@ -81,7 +81,7 @@ CURATED_SEED_JOBS = [
         "job_type": "FULL_TIME",
         "skills": ["React", "TypeScript", "Tailwind CSS", "Vite", "Framer Motion"],
         "description": "Create responsive, accessible, animated interfaces for next-generation fintech experiences.",
-        "applicant_count": 28,
+        "applicant_count": 8,
         "competition_level": "LOW"
     },
     {
@@ -103,7 +103,7 @@ CURATED_SEED_JOBS = [
         "job_type": "FULL_TIME",
         "skills": ["Docker", "Kubernetes", "AWS", "GitHub Actions", "PostgreSQL", "Linux"],
         "description": "Deploy, monitor, and scale distributed microservices across containerized cloud environments.",
-        "applicant_count": 65,
+        "applicant_count": 35,
         "competition_level": "MEDIUM"
     },
     {
@@ -125,7 +125,7 @@ CURATED_SEED_JOBS = [
         "job_type": "FULL_TIME",
         "skills": ["Python", "SQL", "JavaScript", "Git"],
         "description": "Entry-level software engineering opportunity with mentorship on distributed web architectures.",
-        "applicant_count": 15,
+        "applicant_count": 4,
         "competition_level": "LOW"
     }
 ]

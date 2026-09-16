@@ -25,7 +25,9 @@ def get_redis_client():
     """
     Returns a connected redis.Redis client instance, or None if redis module or server is unavailable.
     """
-    global _redis_client
+    global _redis_client, _redis_available
+    if _redis_available is False:
+        return None
     if _redis_client is not None:
         return _redis_client
 
@@ -43,16 +45,19 @@ def get_redis_client():
         # Test connection ping
         client.ping()
         _redis_client = client
+        _redis_available = True
         return _redis_client
     except Exception as exc:
+        _redis_available = False
         logger.warning(f"[Cache Warning] Unable to connect to Redis at {REDIS_HOST}:{REDIS_PORT}: {exc}. Fallback to PostgreSQL enabled.")
         return None
 
 
 def reset_redis_client():
     """Resets global client cache for testing or re-connection attempts."""
-    global _redis_client
+    global _redis_client, _redis_available
     _redis_client = None
+    _redis_available = None
 
 
 class RedisCacheService:

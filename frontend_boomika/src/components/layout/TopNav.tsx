@@ -6,7 +6,6 @@ import { useTheme } from '../../context/ThemeContext';
 
 export type TabType = 
   | 'discover' 
-  | 'companies'
   | 'applications' 
   | 'messages' 
   | 'analytics' 
@@ -29,7 +28,6 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
 
   const candidateTabs: { id: TabType; label: string }[] = [
     { id: 'discover', label: 'Discover' },
-    { id: 'companies', label: 'Companies' },
     { id: 'applications', label: 'Applications' },
     { id: 'messages', label: 'Messages' },
     { id: 'analytics', label: 'Analytics' },
@@ -42,24 +40,14 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
     { id: 'analytics', label: 'Analytics' },
   ];
 
-  const adminTabs: { id: TabType; label: string }[] = [
-    { id: 'recruiter-dashboard', label: 'Platform Dashboard' },
-    { id: 'recruiter-jobs', label: 'Job Listings' },
-    { id: 'analytics', label: 'System Analytics' },
-  ];
-
-  const tabs = currentRole === 'admin'
-    ? adminTabs
-    : currentRole === 'recruiter'
-      ? recruiterTabs
-      : candidateTabs;
+  const tabs = currentRole === 'recruiter' ? recruiterTabs : candidateTabs;
 
   return (
     <header className="w-full bg-white dark:bg-[#111827] border-b border-slate-200/80 dark:border-slate-700/60 sticky top-0 z-30 px-4 sm:px-8 h-16 flex items-center justify-between">
 
       {/* Brand Logo */}
       <div 
-        onClick={() => onTabChange(currentRole === 'job_seeker' ? 'discover' : 'recruiter-dashboard')}
+        onClick={() => onTabChange(currentRole === 'recruiter' ? 'recruiter-dashboard' : 'discover')}
         className="flex items-center gap-1.5 cursor-pointer select-none"
       >
         <span className="text-2xl font-black tracking-tight text-[#2563EB]">SwipeX</span>

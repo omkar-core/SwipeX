@@ -27,10 +27,8 @@ import {
   PipelineStage,
   RecruiterAnalyticsData,
   CandidateAnalyticsData
-  , AdminDashboardData, AdminUserRecord, AdminRecruiterRecord, AdminJobRecord, AdminApplicationRecord, AdminAnalyticsData,
-  Company, CompanyDetail
 } from '../types';
-import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME, MOCK_COMPANIES } from '../data/mockData';
+import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME } from '../data/mockData';
 
 
 // Realistic network latency simulation helper for mock mode
@@ -122,7 +120,7 @@ export class ApiService {
       user_id: userId,
       name: payload.name,
       email: payload.email,
-      role: payload.role || 'job_seeker',
+      role: payload.role || 'candidate',
       title: payload.role === 'recruiter' ? 'Talent Partner' : 'Senior Product Designer',
       tier: 'Tier 1 Talent',
       avatar: INITIAL_USER.avatar,
@@ -150,11 +148,6 @@ export class ApiService {
       );
       localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, data.access_token);
       localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, data.refresh_token);
-      // Persist login email so /auth/me (which only returns user_id/name/role) can build a full User.
-      const storedUserRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
-      storedUser.email = payload.email;
-      localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(storedUser));
       return data;
     }
 
@@ -162,7 +155,7 @@ export class ApiService {
     await mockDelay(300);
     const accessToken = `mock_jwt_access_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     const refreshToken = `mock_jwt_refresh_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'job_seeker';
+    const role: UserRole = 'candidate';
 
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
@@ -200,7 +193,7 @@ export class ApiService {
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
     await mockDelay(350);
     const accessToken = `mock_jwt_google_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'job_seeker';
+    const role: UserRole = 'candidate';
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(INITIAL_USER));
     return {
@@ -215,26 +208,10 @@ export class ApiService {
    */
   static async getMe(token?: string): Promise<{ user_id: string; name: string; role: UserRole; user: User }> {
     if (!API_CONFIG.USE_MOCK) {
-      // Backend /auth/me returns a flat shape: { user_id, name, role }
-      const data = await httpRequest<{ user_id: string; name: string; role: UserRole }>(
+      return httpRequest<{ user_id: string; name: string; role: UserRole; user: User }>(
         API_ENDPOINTS.AUTH.ME,
         { method: 'GET' }
       );
-      let stored: Partial<User> = {};
-      try {
-        const raw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-        if (raw) stored = JSON.parse(raw);
-      } catch { /* ignore malformed stored user */ }
-      return {
-        ...data,
-        user: {
-          ...stored,
-          user_id: data.user_id,
-          name: data.name,
-          email: stored.email || '',
-          role: data.role,
-        },
-      };
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
@@ -252,64 +229,12 @@ export class ApiService {
     };
   }
 
-  static async getAdminDashboard(): Promise<AdminDashboardData> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { total_users: 1, total_recruiters: user.role === 'recruiter' ? 1 : 0, total_job_seekers: user.role === 'job_seeker' ? 1 : 0, total_jobs: MOCK_JOBS.length, active_jobs: MOCK_JOBS.length, total_applications: 0, pending_items: 0 };
-    }
-    return httpRequest<AdminDashboardData>(API_ENDPOINTS.ADMIN.DASHBOARD);
-  }
-
-  static async getAdminUsers(params: { search?: string; role?: string } = {}): Promise<AdminUserRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return [{ user_id: user.user_id, name: user.name, email: user.email, role: user.role, status: 'active' }].filter((item) => (!params.role || item.role === params.role) && (!params.search || `${item.name} ${item.email}`.toLowerCase().includes(params.search.toLowerCase())));
-    }
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.role) query.set('role', params.role);
-    return httpRequest<AdminUserRecord[]>(`${API_ENDPOINTS.ADMIN.USERS}?${query}`);
-  }
-
-  static async getAdminRecruiters(search?: string): Promise<AdminRecruiterRecord[]> {
-    if (API_CONFIG.USE_MOCK) return [];
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    return httpRequest<AdminRecruiterRecord[]>(`${API_ENDPOINTS.ADMIN.RECRUITERS}${query}`);
-  }
-
-  static async getAdminJobs(params: { search?: string; status?: string } = {}): Promise<AdminJobRecord[]> {
-    if (API_CONFIG.USE_MOCK) return MOCK_JOBS.map((job) => ({ job_id: String(job.job_id), title: job.title, company: job.company, location: job.location, status: 'active' as JobStatus, posted_at: job.posted_at, application_count: 0 })).filter((item) => (!params.status || item.status === params.status) && (!params.search || `${item.title} ${item.company}`.toLowerCase().includes(params.search.toLowerCase())));
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.status) query.set('status', params.status);
-    return httpRequest<AdminJobRecord[]>(`${API_ENDPOINTS.ADMIN.JOBS}?${query}`);
-  }
-
-  static async getAdminApplications(params: { search?: string; stage?: string } = {}): Promise<AdminApplicationRecord[]> {
-    if (API_CONFIG.USE_MOCK) return [];
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.stage) query.set('stage', params.stage);
-    return httpRequest<AdminApplicationRecord[]>(`${API_ENDPOINTS.ADMIN.APPLICATIONS}?${query}`);
-  }
-
-  static async getAdminAnalytics(): Promise<AdminAnalyticsData> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { user_types: { candidates: user.role === 'job_seeker' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
-    }
-    return httpRequest<AdminAnalyticsData>(API_ENDPOINTS.ADMIN.ANALYTICS);
-  }
-
   /* ==========================================================================
      2. JOB & SWIPE CONTRACTS
      ========================================================================== */
 
   /**
-   * GET /api/v1/jobs?type=&location=&remote=&salary_min=&salary_max=&skills=&industry=&q=
+   * GET /api/v1/jobs?type=&location=&remote=&salary_min=&salary_max=&skills=&industry=
    * Queries job listings with filter parameters.
    */
   static async getJobs(params?: {
@@ -320,7 +245,6 @@ export class ApiService {
     salary_max?: number;
     skills?: string;
     industry?: string;
-    q?: string;
   }): Promise<Job[]> {
     if (!API_CONFIG.USE_MOCK) {
       const query = new URLSearchParams();
@@ -332,7 +256,6 @@ export class ApiService {
         if (params.salary_max) query.append('salary_max', params.salary_max.toString());
         if (params.skills) query.append('skills', params.skills);
         if (params.industry) query.append('industry', params.industry);
-        if (params.q) query.append('q', params.q);
       }
       const queryString = query.toString();
       const endpoint = `${API_ENDPOINTS.JOBS.LIST}${queryString ? `?${queryString}` : ''}`;
@@ -344,15 +267,6 @@ export class ApiService {
     let jobs = [...MOCK_JOBS];
 
     if (params) {
-      if (params.q && params.q.trim()) {
-        const queryTerm = params.q.toLowerCase().trim();
-        jobs = jobs.filter(j => 
-          (j.title || '').toLowerCase().includes(queryTerm) ||
-          (j.company || '').toLowerCase().includes(queryTerm) ||
-          (j.description || '').toLowerCase().includes(queryTerm) ||
-          (j.skills_required || j.skills || []).some(s => s.toLowerCase().includes(queryTerm))
-        );
-      }
       if (params.industry && params.industry !== 'All') {
         jobs = jobs.filter(j => 
           (j.industry || '').toLowerCase().includes(params.industry!.toLowerCase())
@@ -399,55 +313,6 @@ export class ApiService {
   }
 
   /**
-   * GET /api/v1/companies
-   * Retrieves paginated companies with optional newly_founded and industry filters.
-   */
-  static async getCompanies(params?: {
-    newly_founded?: boolean;
-    industry?: string;
-    type?: string;
-  }): Promise<Company[]> {
-    if (!API_CONFIG.USE_MOCK) {
-      const query = new URLSearchParams();
-      if (params) {
-        if (params.newly_founded !== undefined) query.append('newly_founded', String(params.newly_founded));
-        if (params.industry) query.append('industry', params.industry);
-        if (params.type) query.append('type', params.type);
-      }
-      const qs = query.toString();
-      return httpRequest<Company[]>(`${API_ENDPOINTS.COMPANIES.LIST}${qs ? `?${qs}` : ''}`, { method: 'GET' });
-    }
-
-    await mockDelay(150);
-    let list = [...MOCK_COMPANIES];
-    if (params?.newly_founded !== undefined) {
-      list = list.filter(c => c.is_newly_founded === params.newly_founded);
-    }
-    if (params?.industry) {
-      list = list.filter(c => (c.industry || '').toLowerCase().includes(params.industry!.toLowerCase()));
-    }
-    return list;
-  }
-
-  /**
-   * GET /api/v1/companies/{company_id}
-   * Retrieves detailed company profile with active jobs.
-   */
-  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
-    if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<CompanyDetail>(API_ENDPOINTS.COMPANIES.DETAIL(companyId), { method: 'GET' });
-    }
-
-    await mockDelay(120);
-    const company = MOCK_COMPANIES.find(c => c.id === companyId) || MOCK_COMPANIES[0];
-    const relatedJobs = MOCK_JOBS.filter(j => (j.company || '').toLowerCase() === company.name.toLowerCase());
-    return {
-      ...company,
-      jobs: relatedJobs
-    };
-  }
-
-  /**
    * POST /api/v1/swipes
    * Records a user's swipe action (Pass / Save / Right / Left).
    */
@@ -458,7 +323,7 @@ export class ApiService {
     if (!API_CONFIG.USE_MOCK) {
       return httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
         method: 'POST',
-        body: JSON.stringify({ ...payload, direction: payload.direction.toUpperCase() }),
+        body: JSON.stringify(payload),
       });
     }
 
@@ -772,33 +637,7 @@ export class ProfileApiService {
 
   static async getProfile(): Promise<UserProfile> {
     if (!API_CONFIG.USE_MOCK) {
-      // The real backend exposes GET /auth/me returning a flat shape:
-      // { user_id, name, role }. Merge with any cached profile fields.
-      const data = await httpRequest<{ user_id: string; name: string; role: UserRole }>(API_ENDPOINTS.PROFILE.ME);
-let stored: Partial<User> = {};
-        try {
-          const raw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-          if (raw) stored = JSON.parse(raw);
-        } catch { /* ignore malformed stored user */ }
-      return {
-        user_id: data.user_id,
-        name: data.name,
-        email: stored.email || '',
-        role: data.role,
-        skills: stored.skills || [],
-        phone: stored.phone,
-        location: stored.location,
-        bio: stored.bio,
-        profile_picture_url: stored.profile_picture_url || stored.avatar,
-        experience_years: stored.experience_years,
-        resume_url: stored.resume_url,
-        current_title: stored.current_title,
-        expected_salary: stored.expected_salary,
-        job_type_preference: stored.job_type_preference,
-        company_name: stored.company_name,
-        company_website: stored.company_website,
-        designation: stored.designation,
-      };
+      return httpRequest<UserProfile>(API_ENDPOINTS.PROFILE.ME);
     }
 
     // Mock Mode

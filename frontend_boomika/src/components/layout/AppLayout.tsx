@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { TopNav, TabType } from './TopNav';
 import { LeftSidebar } from './LeftSidebar';
 import { DiscoverScreen } from '../discover/DiscoverScreen';
-import { CompaniesScreen } from '../companies/CompaniesScreen';
 import { ApplicationsScreen } from '../applications/ApplicationsScreen';
 import { UploadResumeScreen } from '../resume/UploadResumeScreen';
 import { useAuth } from '../../context/AuthContext';
@@ -15,7 +14,6 @@ import { JobPostingsList } from '../recruiter/JobPostingsList';
 import { CandidatePipeline } from '../recruiter/CandidatePipeline';
 import { RecruiterAnalytics } from '../recruiter/RecruiterAnalytics';
 import { AnalyticsScreen } from '../analytics/AnalyticsScreen';
-import { AdminDashboard } from '../admin/AdminDashboard';
 import { useRecruiter } from '../../context/RecruiterContext';
 import { MessageSquare, BarChart3, Users, Building, ShieldAlert, Zap, Sparkles, UserCheck, Briefcase } from 'lucide-react';
 
@@ -24,7 +22,7 @@ export const AppLayout: React.FC = () => {
   const { isAuthenticated, isLoading, currentRole, logout } = useAuth();
   const { setSelectedJobId } = useRecruiter();
   const [activeTab, setActiveTab] = useState<TabType>(() => {
-    return currentRole === 'job_seeker' ? 'discover' : 'recruiter-dashboard';
+    return currentRole === 'recruiter' ? 'recruiter-dashboard' : 'discover';
   });
   const [showAuthPreview, setShowAuthPreview] = useState(false);
   // Feature 8: Onboarding Skills Wizard state
@@ -34,13 +32,13 @@ export const AppLayout: React.FC = () => {
 
   // Sync default tab if currentRole changes
   React.useEffect(() => {
-    if (currentRole === 'recruiter' || currentRole === 'admin') {
+    if (currentRole === 'recruiter') {
       setActiveTab(prev => 
         prev === 'discover' || prev === 'applications' || prev === 'resume' 
           ? 'recruiter-dashboard' 
           : prev
       );
-    } else if (currentRole === 'job_seeker') {
+    } else if (currentRole === 'candidate') {
       setActiveTab(prev => 
         prev === 'recruiter-dashboard' || prev === 'recruiter-post-job' || prev === 'recruiter-pipeline' || prev === 'recruiter-jobs'
           ? 'discover' 
@@ -82,10 +80,6 @@ export const AppLayout: React.FC = () => {
     );
   }
 
-  if (currentRole === 'admin') {
-    return <AdminDashboard />;
-  }
-
   // Determine if we should show left sidebar
   const isSidebarLayout = 
     activeTab === 'applications' || 
@@ -102,7 +96,7 @@ export const AppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F4F7FB] dark:bg-[#0F1629] flex flex-col font-sans">
       {/* Role Notice Banner (if logged in as Recruiter or Admin) */}
-      {currentRole !== 'job_seeker' && (
+      {currentRole !== 'candidate' && (
         <div className="bg-slate-900 text-white px-4 py-1.5 text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="bg-blue-600 text-white text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded">
@@ -198,7 +192,6 @@ export const AppLayout: React.FC = () => {
             /* Candidate-Facing Views (Untouched) */
             <>
               {activeTab === 'discover' && <DiscoverScreen />}
-              {activeTab === 'companies' && <CompaniesScreen />}
               {activeTab === 'applications' && (
                 <ApplicationsScreen onNavigateToResume={() => setActiveTab('resume')} />
               )}

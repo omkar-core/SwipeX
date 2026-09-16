@@ -10,6 +10,8 @@ import { SwipeStatsWidget } from './SwipeStatsWidget';
 import { JobDetailModal } from './JobDetailModal';
 import { Job } from '../../types';
 
+import { ApiService } from '../../services/api';
+
 export const DiscoverScreen: React.FC = () => {
   const { user } = useAuth();
   const {
@@ -72,10 +74,18 @@ export const DiscoverScreen: React.FC = () => {
     }
   }, [handleSaveWithStats, handlePassWithStats]);
 
-  const openJobDetail = useCallback(() => {
+  const openJobDetail = useCallback(async () => {
     if (currentJob) {
       setDetailJob(currentJob);
       setIsDetailOpen(true);
+      try {
+        const fullDetail = await ApiService.getJobById(String(currentJob.job_id));
+        if (fullDetail) {
+          setDetailJob(fullDetail);
+        }
+      } catch (err) {
+        console.warn("Could not fetch full job details, using feed summary:", err);
+      }
     }
   }, [currentJob]);
 

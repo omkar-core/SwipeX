@@ -24,6 +24,9 @@ class JobSummarySchema(BaseModel):
     salary_range: Optional[str] = Field(None, description="Formatted raw salary string")
     skills: List[str] = Field(default_factory=list, description="Array of skill names")
     posted_at: str = Field(..., description="Verbatim relative posting string (e.g. '6 Days Ago')")
+    freshness_level: str = Field("FRESH", description="Calculated freshness tier (FRESH, RECENT, AGING, STALE)")
+    applicant_count: int = Field(0, description="Total number of job applicants")
+    competition_level: str = Field("LOW", description="Competition level tier (LOW, MEDIUM, HIGH)")
 
 
 class JobDetailSchema(BaseModel):
@@ -45,6 +48,9 @@ class JobDetailSchema(BaseModel):
     posted_at_raw: str = Field(..., description="Verbatim raw posted string")
     posted_at_approx: Optional[str] = Field(None, description="Normalized ISO 8601 timestamp")
     skills: List[str] = Field(default_factory=list, description="Array of skill names")
+    freshness_level: str = Field("FRESH", description="Calculated freshness tier (FRESH, RECENT, AGING, STALE)")
+    applicant_count: int = Field(0, description="Total number of job applicants")
+    competition_level: str = Field("LOW", description="Competition level tier (LOW, MEDIUM, HIGH)")
 
 
 class ErrorResponseSchema(BaseModel):

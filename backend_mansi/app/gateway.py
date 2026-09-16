@@ -118,12 +118,12 @@ async def gateway_job_search(request: Request, current_user: User = Depends(get_
 
 
 @router.get("/api/v1/jobs")
-async def gateway_list_jobs(request: Request, current_user: User = Depends(get_optional_current_user)):
+async def gateway_list_jobs(request: Request, current_user: Optional[User] = Depends(get_optional_current_user)):
     return await _proxy(request, _job_service_url(), "/api/v1/jobs", current_user=current_user)
 
 
 @router.get("/api/v1/jobs/{job_id}")
-async def gateway_job_detail(job_id: str, request: Request, current_user: User = Depends(get_optional_current_user)):
+async def gateway_job_detail(job_id: str, request: Request, current_user: Optional[User] = Depends(get_optional_current_user)):
     return await _proxy(request, _job_service_url(), f"/api/v1/jobs/{job_id}", current_user=current_user)
 
 

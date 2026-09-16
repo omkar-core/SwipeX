@@ -17,7 +17,7 @@ Three dependencies:
 """
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -58,19 +58,14 @@ def get_optional_current_user(
     db: Session = Depends(get_db),
 ) -> Optional[User]:
     """Returns the User if a valid token is given, otherwise None — never raises."""
-    if credentials is None:
+    if credentials is None or not credentials.credentials:
         return None
     try:
         payload = decode_access_token(credentials.credentials)
-    except JWTError:
+        user_id = payload.get("sub")
+        return db.query(User).filter(User.id == user_id).first()
+    except Exception:
         return None
-
-    user_id = payload.get("sub")
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None or not user.is_active:
-        return None
-    return user
-
 
 def require_role(*allowed_roles: str):
     """

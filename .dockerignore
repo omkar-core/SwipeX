@@ -1,0 +1,16 @@
+# Build/test artifacts that must never be copied into Docker images.
+# All compose services build from the repo root as context.
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+__pycache__/
+**/__pycache__/
+*.pyc
+venv/
+venv311/
+.venv/
+.env
+.git/
+TSconfig.tsbuildinfo
+**/*.tsbuildinfo

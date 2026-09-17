@@ -10,10 +10,6 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-# Ensure DATABASE_URL is set before imports
-if "DATABASE_URL" not in os.environ or "sqlite" in os.environ.get("DATABASE_URL", ""):
-    os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@127.0.0.1:5432/swipex_job_db"
-
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SERVICE_DIR = os.path.join(BASE_DIR, "data_hanith")
 if SERVICE_DIR not in sys.path:

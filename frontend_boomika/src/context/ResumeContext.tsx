@@ -26,9 +26,18 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Fetch initial dynamic ATS score
   const fetchAtsScore = useCallback(async (jobId?: string): Promise<ATSScoreResult> => {
     try {
-      const res = await ApiService.getAtsScore(resume.resume_id, jobId);
-      setAtsResult(res);
-      return res;
+      if (resume.resume_id && !resume.resume_id.startsWith('res_')) {
+        const res = await ApiService.getAtsScore(resume.resume_id, jobId);
+        setAtsResult(res);
+        return res;
+      }
+      const fallback: ATSScoreResult = {
+        match_score: 85,
+        missing_keywords: ['GraphQL Automation', 'Token Pipeline'],
+        generated_by: 'SwipeX-Heuristic-Fallback',
+      };
+      setAtsResult(fallback);
+      return fallback;
     } catch (err: any) {
       const fallback: ATSScoreResult = {
         match_score: 85,

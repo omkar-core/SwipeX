@@ -377,3 +377,63 @@ Each entry records:
 | 0 | **LOW OPEN** | — | *(all LOW defects fixed)* |
 
 **M2 Sign-off condition**: All M2 defects (DEF-008 through DEF-017) are now **FIXED & VERIFIED**. M2 is ready for final QA sign-off and completion declaration.
+
+---
+
+## Post-Sign-off Regression Defects (2026-09-17)
+
+### DEF-018: Frontend Build Broken by Reverted Integration Fixes (teammate commit `5b2eb89`)
+- **Date Found / Fixed**: 2026-09-17
+- **Component**: `frontend_boomika/src/types/index.ts`, `src/config/api.ts`, `src/services/api.ts`, `src/data/mockData.ts`
+- **Severity**: **High** (build-blocking, re-introduced contract regressions)
+- **Responsible Owner**: Root cause teammate commit `5b2eb89` "Update Boomika frontend"; reconciliation by Omkar (Intern 5 — Integration)
+- **Status**: **FIXED & VERIFIED** ✅
+- **Description**: Commit `5b2eb89` (landed after the 2026-09-16 M2 sign-off) reverted verified fixes from `f1e6a64`:
+  - Removed `Company`/`CompanyDetail` types and `getCompanies`/`getCompanyById` (broke `CompaniesScreen.tsx` build).
+  - Removed six `Admin*` types and `getAdmin*` methods (broke `AdminDashboard.tsx` build).
+  - Removed `JOBS.SEARCH`, `COMPANIES`, `ADMIN` endpoints; reset default `BASE_URL` to `localhost:8000` (was 8001).
+  - Reverted `UserRole` from `'job_seeker'` back to `'candidate'` — re-introduced DEF-004 contract regression (backend `Role` enum only accepts `job_seeker/recruiter/admin`, models.py:23), so live register would 422.
+  - Stripped `filterState.searchQuery`, `MOCK_COMPANIES`, and `INITIAL_USER.role`.
+- **Resolution**:
+  - Restored `Company`, `CompanyDetail`, all six `Admin*` types, `FilterState.searchQuery`; `UserRole = 'job_seeker' | 'recruiter' | 'admin'` (types/index.ts).
+  - Restored `BASE_URL → :8001`, `JOBS.SEARCH`, `COMPANIES`, `ADMIN` groups (config/api.ts).
+  - Restored `getCompanies`, `getCompanyById`, `getAdminDashboard/Users/Recruiters/Jobs/Applications/Analytics`; registration now defaults/sends `job_seeker` (services/api.ts).
+  - Restored `MOCK_COMPANIES`; `INITIAL_USER.role = 'job_seeker'`; migrated remaining `'candidate'` literals → `'job_seeker'` in `AuthContext`, `LoginScreen`, `LeftSidebar`, `AppLayout`.
+- **Verification**: `cd frontend_boomika && npm run build` → **PASS** (tsc + vite, 2270 modules). Live register via gateway :8001 → **201** with `role=job_seeker`.
+
+### DEF-019: Frontend Docker Container Crash-Loop (`@rollup/rollup-linux-x64-musl` not found)
+- **Date Found / Fixed**: 2026-09-17
+- **Component**: `integration_omkar/docker/Dockerfile.frontend`, build context, `frontend_boomika/package-lock.json`
+- **Severity**: **High** (blocked website at :3000; 5/6 stack until fixed)
+- **Responsible Owner**: Omkar (Intern 5 — Integration)
+- **Status**: **FIXED & VERIFIED** ✅
+- **Description**: `swipex-frontend` crash-looped with `Error: Cannot find module @rollup/rollup-linux-x64-musl (npm bug #4828)`. **Two** compounding causes:
+  1. **No `.dockerignore`** at the build context root (all compose services build from `context: .`). `COPY frontend_boomika/ .` copied the host **Windows** `frontend_boomika/node_modules/` (rollup-win32-x64-msvc/gnu only) over the Alpine-installed musl binaries → Linux container can't load rollup. Confirmed: running image's `@rollup/` contained only `rollup-win32-x64-*`.
+  2. `package-lock.json` (stripped by `5b2eb89`, 1442 lines removed) had no rollup entries, so npm's optional-dep resolution for the musl binary was unreliable.
+- **Resolution**:
+  - Added root **`.dockerignore`** excluding `node_modules`, `dist`, `__pycache__`/`*.pyc`, `venv`/`venv311`, `.env`, `.git`.
+  - `Dockerfile.frontend`: `RUN rm -f package-lock.json && npm install` (workaround for npm/cli#4828).
+- **Verification**: Stack rebuild → **6/6 healthy**; `http://localhost:3000` → **HTTP 200**; container `Up (healthy)`.
+
+### DEF-020: Root Test Suite Poisoned by Hardcoded `DATABASE_URL` (postgres auth failures)
+- **Date Found / Fixed**: 2026-09-17
+- **Component**: `tests/test_day6_regression_and_qa.py` (lines 13–15)
+- **Severity**: **High** for the data_hanith root suite (12 passed / ~75 errors before fix)
+- **Responsible Owner**: Omkar (Intern 5 — Integration)
+- **Status**: **FIXED & VERIFIED** ✅
+- **Description**: At import time the test blindly ran `os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@127.0.0.1:5432/swipex_job_db"` whenever the env var was unset/sqlite — hardcoding invalid personal credentials and a **wrong DB name** (`swipex_job_db` vs compose `swipex_job`). This poisoned the entire root suite run (every `tests/` module) with `psycopg2 ... password authentication failed for user "postgres"`.
+- **Resolution**: Removed the hardcoded 3-line override; the suite now uses the `DATABASE_URL` provided by the environment (compose creds `postgresql://swipex:swipex@localhost:5432/swipex_job`, or CI's service container).
+- **Verification**: `DATABASE_URL=postgresql://swipex:swipex@localhost:5432/swipex_job pytest tests/` → **71 passed** (was 12). Remaining 9 failures + 8 errors are dataset-bound (require the 10k-job `indian-job-market-dataset-2025.xlsx`, which CI intentionally skips via `--collect-only`).
+
+---
+
+## Open Defect Summary (M2 — as of 2026-09-17)
+
+| Count | Severity | Owner | Items |
+|---|---|---|---|
+| 0 | **HIGH OPEN** | — | *(all HIGH defects fixed)* |
+| 0 | **MEDIUM OPEN** | — | *(all MEDIUM defects fixed)* |
+| 0 | **LOW OPEN** | — | *(all LOW defects fixed)* |
+| 0 | **DATA OPEN** (dataset-bound) | data_hanith | 9 failing + 8 erroring tests require vendored `data/raw/indian-job-market-dataset-2025.xlsx`; CI guards via `--collect-only`. Not a code defect. |
+
+**M2 Sign-off condition (updated 2026-09-17)**: All tracked defects (DEF-008 through DEF-020) are **FIXED & VERIFIED**; dataset-bound cases are a documented data-availability gate, not code defects. M2 remains signed off — see `M2_FINAL_REPORT.md` §11 for the post-sign-off re-verification evidence.

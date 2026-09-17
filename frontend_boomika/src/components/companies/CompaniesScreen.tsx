@@ -123,8 +123,8 @@ export const CompaniesScreen: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCompanies.map((company) => (
             <div
-              key={company.id}
-              onClick={() => handleSelectCompany(company.id)}
+              key={company.company_id || company.id || company.name}
+              onClick={() => handleSelectCompany(company.company_id || company.id)}
               className="bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-slate-700/60 p-6 shadow-subtle hover:shadow-md hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all cursor-pointer flex flex-col justify-between group"
             >
               <div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TopNav, TabType } from './TopNav';
 import { LeftSidebar } from './LeftSidebar';
 import { DiscoverScreen } from '../discover/DiscoverScreen';
+import { CompaniesScreen } from '../companies/CompaniesScreen';
 import { ApplicationsScreen } from '../applications/ApplicationsScreen';
 import { UploadResumeScreen } from '../resume/UploadResumeScreen';
 import { useAuth } from '../../context/AuthContext';
@@ -38,7 +39,7 @@ export const AppLayout: React.FC = () => {
           ? 'recruiter-dashboard' 
           : prev
       );
-    } else if (currentRole === 'candidate') {
+    } else if (currentRole === 'job_seeker') {
       setActiveTab(prev => 
         prev === 'recruiter-dashboard' || prev === 'recruiter-post-job' || prev === 'recruiter-pipeline' || prev === 'recruiter-jobs'
           ? 'discover' 
@@ -96,7 +97,7 @@ export const AppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F4F7FB] dark:bg-[#0F1629] flex flex-col font-sans">
       {/* Role Notice Banner (if logged in as Recruiter or Admin) */}
-      {currentRole !== 'candidate' && (
+      {currentRole !== 'job_seeker' && (
         <div className="bg-slate-900 text-white px-4 py-1.5 text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="bg-blue-600 text-white text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded">
@@ -192,6 +193,7 @@ export const AppLayout: React.FC = () => {
             /* Candidate-Facing Views (Untouched) */
             <>
               {activeTab === 'discover' && <DiscoverScreen />}
+              {activeTab === 'companies' && <CompaniesScreen />}
               {activeTab === 'applications' && (
                 <ApplicationsScreen onNavigateToResume={() => setActiveTab('resume')} />
               )}

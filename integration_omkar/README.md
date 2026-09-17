@@ -241,7 +241,7 @@ cd frontend_boomika && npm run build
 6. **AI Recommendations** panel (DiscoverScreen): affinity scores; clicking a role opens its detail via canonical UUID.
 7. **Applications** screen: "Saved" roles + "Swipes" toggle = chronological right/left decisions.
 8. **RBAC**: logout → login as **Recruiter** → swipe blocked (403 Forbidden), recruiter job-posting route (`POST /api/v1/jobs`) reachable.
-9. **Quality gates**: `pytest integration_omkar/tests/` → 52/52; `pytest backend_mansi/tests/` → 28/28; `pytest aiml_hemalatha/tests/` → 9/9; `npm run build` → exit 0.
+9. **Quality gates**: `pytest integration_omkar/tests/` → 55/55; `pytest backend_mansi/tests/` → 28/28; `pytest aiml_hemalatha/tests/` → 9/9; `npm run build` → exit 0. (Dataset-bound root-suite cases skip by CI design when `data/raw/indian-job-market-dataset-2025.xlsx` is absent.)
 
 ## 6. Deployment Boundary
 

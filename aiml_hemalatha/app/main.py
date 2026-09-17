@@ -207,10 +207,29 @@ def recommendations(
 
     if not user:
 
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
+        # Real authenticated users are identified by UUIDs and are not in
+        # the static TEST_USERS map. Fall back to the most recent uploaded
+        # resume's skills so recommendations work for any registered user.
+        if RESUME_STORE:
+
+            latest_resume_id = list(
+                RESUME_STORE.keys()
+            )[-1]
+
+            user = {
+                "user_id": user_id,
+                "skills": RESUME_STORE[
+                    latest_resume_id
+                ]["parsed_skills"],
+                "location": ""
+            }
+
+        else:
+
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
 
     jobs = get_jobs()
 

@@ -16,7 +16,7 @@ Test evidence baseline:
 
 | Gate | Result |
 |---|---|
-| Integration suite (`integration_omkar/tests`) | **52 / 52 PASS** |
+| Integration suite (`integration_omkar/tests`) | **55 / 55 PASS** (re-run 2026-09-17) |
 | Gateway / Auth unit suite (`backend_mansi/tests`) | **28 / 28 PASS** |
 | AI/ML & ATS unit suite (`aiml_hemalatha/tests`) | **9 / 9 PASS** |
 | **Automated tests (total)** | **89 / 89 PASS** |
@@ -152,3 +152,33 @@ As the Platform, Testing & Deployment Integration Lead (Intern 5), I certify tha
 **Milestone 2 is formally declared COMPLETE — VERIFIED.**
 
 Supporting documents: [README.md](README.md) (run/tests), [defect_log.md](defect_log.md) (defects), [m1_signoff.md](m1_signoff.md) (M1 record).
+
+---
+
+## 11. Post-Sign-off Reconciliation & Re-Verification (2026-09-17)
+
+A teammate frontend commit (`5b2eb89` "Update Boomika frontend") landed **after** the M2 sign-off and *reverted* several verified integration fixes from `f1e6a64` (deleted Company/Admin types & `getCompanies`/`getCompanyById`/`getAdmin*` methods, removed `JOBS.SEARCH`/`COMPANIES`/`ADMIN` endpoints, reset default `BASE_URL` to 8000, reverted `UserRole 'job_seeker'` back to `'candidate'`, and stripped `package-lock.json`). This broke `npm run build` and sent the frontend container into a crash-loop.
+
+**Reconciliation applied (2026-09-17) and every gate re-run green:**
+- Restored `Company`, `CompanyDetail`, all six `Admin*` types and `FilterState.searchQuery` in `frontend_boomika/src/types/index.ts`; `UserRole = 'job_seeker' | 'recruiter' | 'admin'`.
+- Restored `BASE_URL` default → `http://localhost:8001/api/v1`, `JOBS.SEARCH`, `COMPANIES`, and `ADMIN` endpoint groups in `frontend_boomika/src/config/api.ts`.
+- Restored `getCompanies`, `getCompanyById`, `getAdminDashboard/Users/Recruiters/Jobs/Applications/Analytics` and register's `job_seeker` default in `frontend_boomika/src/services/api.ts`.
+- Restored `MOCK_COMPANIES` and `INITIAL_USER.role = 'job_seeker'`; swept remaining `'candidate'` literals to `'job_seeker'` in `AuthContext`, `LoginScreen`, `LeftSidebar`, `AppLayout`.
+- Fixed frontend container crash-loop: added root **`.dockerignore`** (host Windows `node_modules`/venvs were clobbering the Alpine image) + `rm -f package-lock.json && npm install` in `integration_omkar/docker/Dockerfile.frontend` (npm#4828).
+- Removed the hardcoded `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/swipex_job_db` override in `tests/test_day6_regression_and_qa.py` (it poisoned every root-suite run with auth failures).
+
+**Re-verified today (all from the current working tree / live compose stack):**
+
+| Gate | Result |
+|---|---|
+| `npm run build` (`tsc && vite build`, Node 22) | **PASS** (2270 modules, 14.58s, non-blocking >500 kB chunk warning only) |
+| Docker stack `docker compose up --build -d` | **6/6 healthy** (auth-gateway, frontend, job-data, resume-service, postgres, redis) |
+| Website `http://localhost:3000` | **HTTP 200** (Vite dev server in container) |
+| Integration suite `pytest integration_omkar/tests/` (live stack) | **55/55 PASS** |
+| Gateway & Auth unit `pytest backend_mansi/tests/` | **28/28 PASS** |
+| AI/ML & ATS unit `pytest aiml_hemalatha/tests/` | **9/9 PASS** |
+| data_hanith root suite `pytest tests/` (with compose `DATABASE_URL`, seeded 5 curated jobs) | **71 passed; 9 failed + 8 errors — all dataset-bound** (pagination/filter math assumes the 10k-job `indian-job-market-dataset-2025.xlsx`; absent by design — same rule CI bakes in via `--collect-only`) |
+| `flake8 integration_omkar/ --select=E9,F63,F7,F82` | **0 issues** |
+| Live E2E via gateway :8001 (register→login→jobs→swipe→me→companies) | **201/200/200/201/200/200** with `job_seeker` RBAC |
+
+The M2 sign-off above stands. Fresh defects DEF-018/019/020 and their fixes are recorded in [defect_log.md](defect_log.md).

@@ -1,5 +1,5 @@
 -- =============================================================================
--- SwipeX Job & Data Intelligence Domain Canonical Schema (Milestone 2)
+-- SwipeX Job & Data Intelligence Domain Canonical Schema (Milestone 3)
 -- Database Engine: PostgreSQL 14+
 -- Primary Key Strategy: UUID (uuid-ossp + uuid_generate_v4())
 -- Service Boundary: Job & Data Intelligence Service (swipex_job_db)
@@ -83,14 +83,19 @@ CREATE TABLE IF NOT EXISTS skills (
 -- Single clean case-insensitive uniqueness strategy
 CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_name_lower ON skills(LOWER(name));
 
--- 4. JOB_SKILLS JUNCTION TABLE
+-- 4. JOB_SKILLS JUNCTION TABLE (Extended M3)
 CREATE TABLE IF NOT EXISTS job_skills (
     job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
     skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
-    PRIMARY KEY (job_id, skill_id)
+    is_required BOOLEAN NOT NULL DEFAULT TRUE, -- M3 Extension
+    weight NUMERIC(3, 2) NOT NULL DEFAULT 1.00, -- M3 Extension
+    min_years NUMERIC(4, 1) NULL, -- M3 Extension
+    PRIMARY KEY (job_id, skill_id),
+    CONSTRAINT chk_job_skill_weight CHECK (weight >= 0.00 AND weight <= 5.00)
 );
 
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill_id ON job_skills(skill_id);
+CREATE INDEX IF NOT EXISTS idx_job_skills_required ON job_skills(job_id, is_required);
 
 -- 5. SWIPES TABLE
 CREATE TABLE IF NOT EXISTS swipes (
@@ -119,7 +124,65 @@ CREATE TABLE IF NOT EXISTS saved_jobs (
 CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id ON saved_jobs(user_id);
 CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_job ON saved_jobs(user_id, job_id);
 
--- 7. POSTGRESQL TRIGRAM GIN SEARCH INDEXES (pg_trgm)
+-- 7. RESUMES TABLE (M3 Entity: Parent Container)
+CREATE TABLE IF NOT EXISTS resumes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    title VARCHAR(255) NOT NULL DEFAULT 'Default Resume',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_resume_title ON resumes(user_id, LOWER(title));
+CREATE INDEX IF NOT EXISTS idx_resumes_user_id ON resumes(user_id);
+
+-- 8. RESUME_VERSIONS TABLE (M3 Entity: Multi-versioning)
+CREATE TABLE IF NOT EXISTS resume_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    resume_id UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512) NOT NULL,
+    raw_text TEXT NOT NULL,
+    parsed_json JSONB NOT NULL,
+    version_number INTEGER NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_resume_version_num UNIQUE (resume_id, version_number)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_resume_active_version ON resume_versions(resume_id) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_resume_versions_resume_id ON resume_versions(resume_id);
+CREATE INDEX IF NOT EXISTS idx_resume_versions_active ON resume_versions(resume_id, is_active);
+
+-- 9. JOB_KEYWORDS TABLE (M3 Entity: Extracted Keywords)
+CREATE TABLE IF NOT EXISTS job_keywords (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    keyword VARCHAR(100) NOT NULL,
+    keyword_type VARCHAR(50) NOT NULL,
+    weight NUMERIC(3, 2) NOT NULL DEFAULT 1.00,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_job_keyword_weight CHECK (weight >= 0.00 AND weight <= 5.00)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_job_keyword_type ON job_keywords(job_id, LOWER(keyword), keyword_type);
+CREATE INDEX IF NOT EXISTS idx_job_keywords_job_id ON job_keywords(job_id);
+
+-- 10. ATS_SCORES TABLE (M3 Entity: Persisted ATS Score Evaluations)
+CREATE TABLE IF NOT EXISTS ats_scores (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    resume_version_id UUID NOT NULL REFERENCES resume_versions(id) ON DELETE CASCADE,
+    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    match_score NUMERIC(5, 2) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_resume_version_job_ats UNIQUE (resume_version_id, job_id),
+    CONSTRAINT chk_ats_match_score CHECK (match_score >= 0.00 AND match_score <= 100.00)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ats_scores_resume_version ON ats_scores(resume_version_id);
+CREATE INDEX IF NOT EXISTS idx_ats_scores_job_id ON ats_scores(job_id);
+
+-- 11. POSTGRESQL TRIGRAM GIN SEARCH INDEXES (pg_trgm)
 CREATE INDEX IF NOT EXISTS idx_jobs_title_trgm ON jobs USING gin (title gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_jobs_description_trgm ON jobs USING gin (job_description gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_companies_name_trgm ON companies USING gin (name gin_trgm_ops);

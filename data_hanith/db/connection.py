@@ -30,8 +30,9 @@ def get_raw_connection(db_url: str):
     else:
         path = db_url.replace("sqlite:///", "")
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        conn = sqlite3.connect(path)
+        conn = sqlite3.connect(path, timeout=30.0)
         conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("PRAGMA journal_mode = WAL;")
         return conn, "sqlite"
 
 
@@ -75,8 +76,8 @@ def init_db(db_url: str, schema_sql_path: str = None):
                 size TEXT NULL,
                 industry TEXT NULL,
                 is_newly_founded INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_companies_raw_id ON companies(raw_company_id);
@@ -103,8 +104,8 @@ def init_db(db_url: str, schema_sql_path: str = None):
                 competition_level TEXT NOT NULL DEFAULT 'LOW' CHECK (competition_level IN ('LOW', 'MEDIUM', 'HIGH')),
                 posted_at_raw TEXT NOT NULL,
                 posted_at_approx TEXT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);

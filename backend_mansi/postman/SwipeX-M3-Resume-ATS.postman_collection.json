@@ -1,0 +1,107 @@
+{
+  "info": {
+    "name": "SwipeX — Milestone 3 (Resume + ATS)",
+    "description": "Day 5 deliverable: Resume upload/parse and ATS scoring behind the Gateway. Run 'Login' first (from the M2 collection) or use the one included here.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8001" },
+    { "key": "access_token", "value": "" },
+    { "key": "resume_id", "value": "" },
+    { "key": "job_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login (saves token automatically)",
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "const b = pm.response.json();",
+          "pm.collectionVariables.set('access_token', b.access_token);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"seeker@example.com\",\n  \"password\": \"password123\"\n}" },
+        "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] }
+      }
+    },
+    {
+      "name": "Resume Service",
+      "item": [
+        {
+          "name": "Upload resume",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('resume_id', pm.response.json().resume_id);",
+              "}"
+            ]}
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] },
+            "url": { "raw": "{{base_url}}/api/v1/resumes/upload", "host": ["{{base_url}}"], "path": ["api","v1","resumes","upload"] }
+          }
+        },
+        {
+          "name": "List my resumes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/resumes", "host": ["{{base_url}}"], "path": ["api","v1","resumes"] }
+          }
+        },
+        {
+          "name": "Resume detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/resumes/{{resume_id}}", "host": ["{{base_url}}"], "path": ["api","v1","resumes","{{resume_id}}"] }
+          }
+        },
+        {
+          "name": "Trigger parse",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/resumes/{{resume_id}}/parse", "host": ["{{base_url}}"], "path": ["api","v1","resumes","{{resume_id}}","parse"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ATS Scoring",
+      "item": [
+        {
+          "name": "Get ATS score",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"resume_id\": \"{{resume_id}}\",\n  \"job_id\": \"{{job_id}}\"\n}" },
+            "url": { "raw": "{{base_url}}/api/v1/ats/score", "host": ["{{base_url}}"], "path": ["api","v1","ats","score"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recommendations (upgraded engine, same route)",
+      "item": [
+        {
+          "name": "Get recommendations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{base_url}}/api/v1/recommendations", "host": ["{{base_url}}"], "path": ["api","v1","recommendations"] }
+          }
+        }
+      ]
+    }
+  ]
+}

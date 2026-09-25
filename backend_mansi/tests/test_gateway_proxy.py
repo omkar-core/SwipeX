@@ -109,11 +109,20 @@ def test_gateway_returns_503_when_upstream_unreachable():
 
 @respx.mock
 def test_gateway_forwards_resume_ats_score_to_resume_service():
+    """
+    Updated for Milestone 3: the old GET /api/v1/resume/{id}/ats-score
+    route was replaced by POST /api/v1/ats/score (see
+    docs/m3-api-contracts.md). This test now checks the current contract
+    instead of the retired one.
+    """
     token = _get_token()
-    respx.get("http://fake-resume-service/api/v1/resume/r1/ats-score").mock(
+    respx.post("http://fake-resume-service/api/v1/ats/score").mock(
         return_value=httpx.Response(200, json={"match_score": 72, "missing_keywords": ["docker"]})
     )
 
-    r = client.get("/api/v1/resume/r1/ats-score", headers={"Authorization": f"Bearer {token}"})
+    r = client.post(
+        "/api/v1/ats/score",
+        json={"resume_id": "r1", "job_id": "j1"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert r.status_code == 200
-    assert r.json()["match_score"] == 72

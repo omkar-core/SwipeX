@@ -9,7 +9,18 @@ Milestone 2 (Day 3-4): swipe direction normalised to UPPERCASE before
 forwarding (data_hanith stores RIGHT/LEFT; our API contract and the
 frontend use lowercase right/left — normalising here means neither side
 has to change); Recruiter job-posting CRUD stub; Matching Engine route.
-Milestone 2 (Day 5): all M2 services reachable through this one Gateway.
+Milestone 2 (Day 5): all M2 services reachable through this one Gateway;
+Gateway-secret header now always sent (fallback default matches
+data_hanith's own default), resolved during a merge with a teammate's
+concurrent edit to this same file.
+Milestone 2 (post-Day 5): _proxy now handles httpx.TimeoutException
+separately from ConnectError (504 vs 503) — a slow-but-reachable upstream
+used to crash with an unhandled 500; timeout raised to 30s.
+Milestone 3 (Day 1-5): Resume Service (upload/list/detail/parse) and ATS
+Scoring (/ats/score) replace the M1 Resume placeholder routes, now with
+the real contract. Resume actions restricted to Job Seeker; ATS score
+requires login only (a Recruiter viewing a candidate's fit is plausible
+future use, so it's not role-locked here — revisit if that's wrong).
 
 This is the single entry point the frontend talks to. It enforces
 "is this person even logged in" (and, where relevant, "does their role
@@ -57,9 +68,11 @@ async def _proxy(
 
     body_override: used when the Gateway rewrites the payload before
     forwarding (see swipe direction normalisation below).
-    current_user: when given, injects X-User-Id / X-User-Role identity
-    headers, which data_hanith's dependencies.py reads for trusted
-    internal calls.
+    current_user: when given, injects X-User-Id / X-User-Role / X-Gateway-Secret
+    identity headers, which data_hanith's dependencies.py reads for trusted
+    internal calls. The secret has a fallback default matching their own
+    documented default, so this works out of the box even before either
+    .env is customised.
     """
     url = f"{base_url}{path}"
     headers = {
@@ -68,11 +81,11 @@ async def _proxy(
     }
 
     if current_user is not None:
-        headers["X-User-Id"] = current_user.id
-        headers["X-User-Role"] = current_user.role.value
-        gateway_secret = os.getenv("GATEWAY_SHARED_SECRET")
-        if gateway_secret:
-            headers["X-Gateway-Secret"] = gateway_secret
+        headers["X-User-Id"] = str(current_user.id)
+        headers["X-User-Role"] = str(current_user.role.value)
+        headers["X-Gateway-Secret"] = os.getenv(
+            "GATEWAY_SHARED_SECRET", "swipex-internal-gateway-secret"
+        )
 
     content = body_override if body_override is not None else await request.body()
 
@@ -84,12 +97,17 @@ async def _proxy(
                 params=request.query_params,
                 headers=headers,
                 content=content,
-                timeout=10.0,
+                timeout=30.0,
             )
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,
                 detail=f"Upstream service unreachable at {base_url} — is it running?",
+            )
+        except httpx.TimeoutException:
+            raise HTTPException(
+                status_code=504,
+                detail=f"Upstream service at {base_url} took too long to respond.",
             )
     return Response(
         content=upstream.content,
@@ -118,12 +136,12 @@ async def gateway_job_search(request: Request, current_user: User = Depends(get_
 
 
 @router.get("/api/v1/jobs")
-async def gateway_list_jobs(request: Request, current_user: Optional[User] = Depends(get_optional_current_user)):
+async def gateway_list_jobs(request: Request, current_user: User = Depends(get_optional_current_user)):
     return await _proxy(request, _job_service_url(), "/api/v1/jobs", current_user=current_user)
 
 
 @router.get("/api/v1/jobs/{job_id}")
-async def gateway_job_detail(job_id: str, request: Request, current_user: Optional[User] = Depends(get_optional_current_user)):
+async def gateway_job_detail(job_id: str, request: Request, current_user: User = Depends(get_optional_current_user)):
     return await _proxy(request, _job_service_url(), f"/api/v1/jobs/{job_id}", current_user=current_user)
 
 
@@ -213,14 +231,58 @@ async def gateway_recommendations(request: Request, current_user: User = Depends
 
 
 # ---------------------------------------------------------------------------
-# Resume/ATS service — placeholder routes (Milestone 1 Day 4).
+# Resume Service — Milestone 3. Replaces the M1 placeholder routes with the
+# real contract: upload, list versions, get one version, trigger parsing.
+# All require login (a resume is personal data); uploads/parsing restricted
+# to Job Seeker, matching FR-01 ownership (Intern 1/2/3) and the M3 Day 2-3
+# brief ("RBAC restricting uploads to the Job Seeker role").
 # ---------------------------------------------------------------------------
 
-@router.post("/api/v1/resume/upload")
-async def gateway_resume_upload(request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, _resume_service_url(), "/api/v1/resume/upload", current_user=current_user)
+@router.post("/api/v1/resumes/upload")
+async def gateway_resume_upload(
+    request: Request,
+    current_user: User = Depends(require_role("job_seeker")),
+):
+    return await _proxy(request, _resume_service_url(), "/api/v1/resumes/upload", current_user=current_user)
 
 
-@router.get("/api/v1/resume/{resume_id}/ats-score")
-async def gateway_ats_score(resume_id: str, request: Request, current_user: User = Depends(get_current_user)):
-    return await _proxy(request, _resume_service_url(), f"/api/v1/resume/{resume_id}/ats-score", current_user=current_user)
+@router.get("/api/v1/resumes")
+async def gateway_list_resumes(request: Request, current_user: User = Depends(get_current_user)):
+    """Lists the logged-in user's uploaded resume versions."""
+    return await _proxy(request, _resume_service_url(), "/api/v1/resumes", current_user=current_user)
+
+
+@router.get("/api/v1/resumes/{resume_id}")
+async def gateway_resume_detail(resume_id: str, request: Request, current_user: User = Depends(get_current_user)):
+    return await _proxy(request, _resume_service_url(), f"/api/v1/resumes/{resume_id}", current_user=current_user)
+
+
+@router.post("/api/v1/resumes/{resume_id}/parse")
+async def gateway_resume_parse(
+    resume_id: str,
+    request: Request,
+    current_user: User = Depends(require_role("job_seeker")),
+):
+    """
+    Milestone 3 Day 3: triggers Intern 4's text/skill-extraction module.
+    Stores parsed_text and extracted_skills back on the resume record
+    (handled entirely on the Resume Service side — the Gateway just routes
+    and gates this by role).
+    """
+    return await _proxy(request, _resume_service_url(), f"/api/v1/resumes/{resume_id}/parse", current_user=current_user)
+
+
+# ---------------------------------------------------------------------------
+# ATS Scoring — Milestone 3 Day 4-5. Blended keyword + semantic score
+# between a resume and a job, missing-skill/keyword detection, and
+# AI-generated improvement suggestions (extended onto the same response
+# per the Day 5 brief: "AI-suggestions endpoint (or extend /ats/score)").
+# ---------------------------------------------------------------------------
+
+@router.post("/api/v1/ats/score")
+async def gateway_ats_score(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Body: { resume_id, job_id } -> { match_score, missing_keywords[], missing_skills[], suggestions[] }"""
+    return await _proxy(request, _resume_service_url(), "/api/v1/ats/score", current_user=current_user)

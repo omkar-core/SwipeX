@@ -339,3 +339,127 @@ class JobRepository:
             "applicant_count": app_count,
             "competition_level": comp_lvl,
         }
+
+    def get_job_required_skills(self, job_id: str) -> List[Dict[str, Any]]:
+        """
+        Retrieves mandatory skills for a job posting.
+        Note: is_required=TRUE is a documented M3 fallback/default for Dataset 1 mapped skills.
+        """
+        cursor = get_dict_cursor(self.conn, self.db_type)
+        param_placeholder = "%s" if self.db_type == "postgres" else "?"
+
+        if self.db_type == "postgres":
+            sql = f"""
+                SELECT s.id AS skill_id, s.name, s.category, js.is_required, js.weight, js.min_years
+                FROM job_skills js
+                JOIN skills s ON js.skill_id = s.id
+                WHERE js.job_id = {param_placeholder} AND js.is_required = TRUE
+            """
+        else:
+            sql = f"""
+                SELECT s.id AS skill_id, s.name, s.category, js.is_required, js.weight, js.min_years
+                FROM job_skills js
+                JOIN skills s ON js.skill_id = s.id
+                WHERE js.job_id = {param_placeholder} AND js.is_required = 1
+            """
+
+        cursor.execute(sql, (str(job_id),))
+        rows = cursor.fetchall()
+        return [
+            {
+                "skill_id": str(r["skill_id"]),
+                "name": r["name"],
+                "category": r["category"],
+                "is_required": bool(r["is_required"]),
+                "weight": float(r["weight"]) if r["weight"] is not None else 1.00,
+                "min_years": float(r["min_years"]) if r["min_years"] is not None else None,
+            }
+            for r in rows
+        ]
+
+    def get_job_keywords_by_type(self, job_id: str, keyword_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieves extracted job keywords by category for a job posting."""
+        cursor = get_dict_cursor(self.conn, self.db_type)
+        param_placeholder = "%s" if self.db_type == "postgres" else "?"
+
+        where_clause = f"WHERE job_id = {param_placeholder}"
+        params = [str(job_id)]
+
+        if keyword_type and keyword_type.strip():
+            where_clause += f" AND UPPER(keyword_type) = UPPER({param_placeholder})"
+            params.append(keyword_type.strip())
+
+        sql = f"""
+            SELECT id, job_id, keyword, keyword_type, weight, created_at
+            FROM job_keywords
+            {where_clause}
+            ORDER BY keyword_type ASC, keyword ASC
+        """
+        cursor.execute(sql, tuple(params))
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": str(r["id"]),
+                "job_id": str(r["job_id"]),
+                "keyword": r["keyword"],
+                "keyword_type": r["keyword_type"],
+                "weight": float(r["weight"]),
+                "created_at": str(r["created_at"]),
+            }
+            for r in rows
+        ]
+
+    def get_job_matching_features(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Assembles complete semantic embedding input features for Intern 4 matching engine.
+        Distinguishes source-derived values, M3 fallbacks, and unavailable NULL fields.
+        """
+        job_data = self.get_job_by_id(job_id)
+        if not job_data:
+            return None
+
+        req_skills = self.get_job_required_skills(job_id)
+        req_skill_names = [s["name"] for s in req_skills]
+        keywords = self.get_job_keywords_by_type(job_id)
+
+        # Monthly salary derivation (annual_salary / 12)
+        monthly_sal = None
+        min_s = job_data.get("min_salary")
+        max_s = job_data.get("max_salary")
+        if min_s is not None and max_s is not None:
+            monthly_sal = round(((min_s + max_s) / 2.0) / 12.0, 2)
+        elif min_s is not None:
+            monthly_sal = round(min_s / 12.0, 2)
+        elif max_s is not None:
+            monthly_sal = round(max_s / 12.0, 2)
+
+        embedding_text = (
+            f"Title: {job_data['title']} | "
+            f"Location: {job_data['location']} | "
+            f"Required Skills: {', '.join(req_skill_names)} | "
+            f"Experience: {job_data.get('min_experience') or 0} - {job_data.get('max_experience') or 0} yrs | "
+            f"Salary: {job_data['salary_range']} (Monthly: {monthly_sal if monthly_sal is not None else 'N/A'}) | "
+            f"Description: {job_data['job_description']}"
+        )
+
+        return {
+            "job_id": job_data["job_id"],
+            "title": job_data["title"],
+            "location": job_data["location"],
+            "required_skills": req_skills,
+            "keywords": keywords,
+            "job_keywords": keywords,
+            "min_experience": job_data["min_experience"],
+            "max_experience": job_data["max_experience"],
+            "salary": {
+                "min_salary": job_data["min_salary"],
+                "max_salary": job_data["max_salary"],
+                "currency": job_data["currency"],
+                "salary_range": job_data["salary_range"],
+            },
+            "salary_range": job_data["salary_range"],
+            "monthly_salary": monthly_sal,
+            "job_description": job_data["job_description"],
+            "embedding_input_text": embedding_text,
+        }
+

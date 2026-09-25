@@ -24,7 +24,7 @@ def test_resume_upload_ats_score_and_recommendations(gateway_url, test_job_seeke
     upload_headers = {k: v for k, v in headers.items() if k.lower() != "content-type"}
 
     upload_res = httpx.post(
-        f"{gateway_url}/api/v1/resume/upload",
+        f"{gateway_url}/api/v1/resumes/upload",
         files=files,
         headers=upload_headers,
         timeout=10.0
@@ -43,17 +43,17 @@ def test_resume_upload_ats_score_and_recommendations(gateway_url, test_job_seeke
     assert jobs_res.status_code == 200
     job_id = jobs_res.json()[0]["job_id"]
 
-    # 3. Calculate heuristic ATS match score via Gateway
-    ats_res = httpx.get(
-        f"{gateway_url}/api/v1/resume/{resume_id}/ats-score?job_id={job_id}",
+    # 3. Calculate ATS match score via Gateway (M3 contract: POST /api/v1/ats/score)
+    ats_res = httpx.post(
+        f"{gateway_url}/api/v1/ats/score",
+        json={"resume_id": resume_id, "job_id": job_id},
         headers=headers,
-        timeout=5.0
+        timeout=10.0
     )
     assert ats_res.status_code == 200, f"ATS score failed: {ats_res.status_code} - {ats_res.text}"
     ats_data = ats_res.json()
-    assert ats_data["resume_id"] == resume_id
-    assert "ats_score" in ats_data or "match_score" in ats_data
-    assert ats_data.get("generated_by") == "heuristic-v0"
+    assert "match_score" in ats_data or "ats_score" in ats_data
+    assert "missing_keywords" in ats_data or "missing_skills" in ats_data or "suggestions" in ats_data
 
     # 4. Fetch job recommendations via Gateway.
     #    The Matching Engine keys recommendations off the caller: pass user_id

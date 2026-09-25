@@ -57,7 +57,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend_mansi/requirements.txt
           pip install -r integration_omkar/requirements.txt
-          pip install openpyxl pandas pdfplumber python-multipart
+          pip install openpyxl pandas pdfplumber python-multipart pytest-mock
 
       - name: Lint Integration Code (flake8 scoped to integration_omkar)
         run: |
@@ -83,6 +83,10 @@ jobs:
             echo "::notice title=data_hanith tests::Raw dataset (data/raw/indian-job-market-dataset-2025.xlsx) is not committed to the repo, so the data-dependent suite cannot execute in CI. Collecting it to verify the suite imports cleanly; a teammate must vendor the dataset for full execution."
             pytest tests/ --collect-only -q
           fi
+
+      - name: Run Milestone 3 Unit & Mocked Tests (integration_omkar)
+        run: |
+          pytest integration_omkar/tests/unit/ integration_omkar/tests/test_m3_resume_upload_scaffold.py integration_omkar/tests/test_m3_storage_vector_mocks.py -v
 
   frontend-build:
     name: Frontend Lint & Build
@@ -141,7 +145,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend_mansi/requirements.txt
           pip install -r integration_omkar/requirements.txt
-          pip install openpyxl pandas pdfplumber python-multipart
+          pip install openpyxl pandas pdfplumber python-multipart pytest-mock
 
       - name: Rebuild full Docker stack from scratch
         if: steps.changes.outputs.integration == 'true'
@@ -152,7 +156,7 @@ jobs:
       - name: Wait for stack health (reporting failing service)
         if: steps.changes.outputs.integration == 'true'
         run: |
-          # Wait for ALL six containers to reach running/healthy.
+          # Wait for ALL eight containers (including MinIO and ChromaDB) to reach running/healthy.
           # Budget: 60 tries * 5s = 300s to absorb cold first boots on shared
           # GitHub runners (fresh postgres initdb, uvicorn boot, vite startup)
           # which are slower than a warm local machine.
@@ -162,7 +166,7 @@ jobs:
           while [ "$TRIES" -lt "$MAX_TRIES" ]; do
             TRIES=$((TRIES + 1))
             BAD=""
-            for c in swipex-postgres swipex-redis swipex-job-data swipex-resume-service swipex-auth-gateway swipex-frontend; do
+            for c in swipex-postgres swipex-redis swipex-minio swipex-chromadb swipex-job-data swipex-resume-service swipex-auth-gateway swipex-frontend; do
               state=$(docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}}' "$c" 2>/dev/null || echo "absent")
               echo "CONTAINER $c: $state"
               if [ "$state" != "running/healthy" ]; then
@@ -170,7 +174,7 @@ jobs:
               fi
             done
             if [ -z "$BAD" ]; then
-              echo "ALL SIX SERVICES RUNNING AND HEALTHY after $((TRIES * 5))s"
+              echo "ALL EIGHT SERVICES RUNNING AND HEALTHY after $((TRIES * 5))s"
               break
             fi
             if [ "$TRIES" -lt "$MAX_TRIES" ]; then
@@ -181,7 +185,7 @@ jobs:
           if [ -n "$BAD" ]; then
             echo "::error::Service(s) failed to become healthy:$BAD"
             docker compose -f docker-compose.dev.yml ps -a
-            for c in swipex-postgres swipex-redis swipex-job-data swipex-resume-service swipex-auth-gateway swipex-frontend; do
+            for c in swipex-postgres swipex-redis swipex-minio swipex-chromadb swipex-job-data swipex-resume-service swipex-auth-gateway swipex-frontend; do
               state=$(docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}}' "$c" 2>/dev/null || echo "absent")
               if [ "$state" != "running/healthy" ]; then
                 echo "::group::docker logs $c (previous 200 lines)"

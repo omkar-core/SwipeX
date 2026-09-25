@@ -206,8 +206,29 @@ Milestone 2 establishes full cross-service integration for the Swipe System, Pub
 | `swipex-frontend` | `frontend_boomika` | 3000 | `3000` | React 18 + Vite swipe deck UI & candidate dashboard |
 | `swipex-postgres` | PostgreSQL 15 | 5432 | `5432` | Relational storage (`swipex_auth` and `swipex_job`) |
 | `swipex-redis` | Redis 7 | 6379 | `6379` | User swipe caching & feed result acceleration |
+| `swipex-minio` | MinIO | 9000/9001 | `9000/9001` | M3 S3-compatible resume document object storage (`swipex-resumes`) |
+| `swipex-chromadb` | ChromaDB 0.5.5 | 8000 | `8004` | M3 Vector database for semantic job & resume embeddings |
 
-## 3. M2 Test Execution Runbook
+## 3. Milestone 3 (Day 1 & Day 2) — Platform, Testing & Integration
+
+Milestone 3 Day 1 and Day 2 establish the infrastructure extensions, automated test harness, and deterministic mock strategies required by the M3 SRS:
+
+### Key Deliverables:
+- **[AI & Vector Mocking Strategy](ai_vector_mocking_strategy.md)** — Offline, deterministic, zero-cost mock strategy for embeddings, ChromaDB, and LLM calls in CI.
+- **[M3 Day 2 Test Case Specifications](m3_day2_test_cases.md)** — 19 comprehensive test cases (14 Resume Upload + 5 Resume List) covering functional, boundary, security, and storage failure modes.
+- **[M3 Day 1 & Day 2 Execution Report](M3_DAY1_DAY2_REPORT.md)** — Detailed verification status, test counts, and teammate dependencies for Day 3.
+- **Automated Test Scaffolds (`integration_omkar/tests/`)**:
+  - `test_m3_resume_upload_scaffold.py`: 19 automated tests validating the Resume Service contract.
+  - `test_m3_storage_vector_mocks.py`: 10 automated unit tests verifying the mock infrastructure.
+
+### Run Milestone 3 Day 2 Automated Tests:
+```bash
+pytest integration_omkar/tests/test_m3_storage_vector_mocks.py integration_omkar/tests/test_m3_resume_upload_scaffold.py -v
+```
+
+---
+
+## 4. M2 & Master Test Execution Runbook
 
 ### Run all M2 Automated Integration Tests:
 ```bash
@@ -225,25 +246,14 @@ pytest aiml_hemalatha/tests/ -v
 cd frontend_boomika && npm run build
 ```
 
-## 4. Milestone 2 Documentation
+## 5. Milestone 2 Documentation
 
 - [M2 Final Report](M2_FINAL_REPORT.md) — acceptance verdict, SRS/FR matrices, live website evidence, CI failure resolution, test & quality results, M1 regression
 - [Integration Defect Log](defect_log.md) — all M2 defects (DEF-008 … DEF-016) with status FIXED & VERIFIED
 - [M1 Sign-off](m1_signoff.md) — Milestone 1 integration record (historical)
 
-## 5. Milestone 2 Demo Sequence (for presentation)
-
-1. Open `http://localhost:3000`; register a **Job Seeker** (instant JWT session; `/auth/me` in DevTools).
-2. **DiscoverScreen**: swipe deck shows title, company, location, salary, freshness badge, competition tier; click a card for the Job Detail Modal; use Save/Pass (Arrow keys) — recorded via `POST /api/v1/swipes` (201); swiped jobs disappear from next feed.
-3. **Search & filters**: keyword input (e.g. "Python"), salary min/max, work-environment toggles (Remote/Hybrid/On-site), industry — feed filters live. Dedicated endpoint: `curl "http://localhost:8001/api/v1/jobs/search?q=Python"`.
-4. **Companies** tab: filtered grid, "Startups & Fast Growing" pill (`newly_founded=true`), company search, detail modal with active openings.
-5. **Resume Upload**: upload `.txt`/`.pdf` → extracted skills + ATS match score gauge.
-6. **AI Recommendations** panel (DiscoverScreen): affinity scores; clicking a role opens its detail via canonical UUID.
-7. **Applications** screen: "Saved" roles + "Swipes" toggle = chronological right/left decisions.
-8. **RBAC**: logout → login as **Recruiter** → swipe blocked (403 Forbidden), recruiter job-posting route (`POST /api/v1/jobs`) reachable.
-9. **Quality gates**: `pytest integration_omkar/tests/` → 55/55; `pytest backend_mansi/tests/` → 28/28; `pytest aiml_hemalatha/tests/` → 9/9; `npm run build` → exit 0. (Dataset-bound root-suite cases skip by CI design when `data/raw/indian-job-market-dataset-2025.xlsx` is absent.)
-
 ## 6. Deployment Boundary
 
-Milestone 2 strictly maintains local container orchestration and CI automation. No production cloud deployment or packaging is introduced.
+Milestone 3 (Day 1 & Day 2) strictly maintains local container orchestration and CI automation. No production cloud deployment or packaging is introduced.
+
 

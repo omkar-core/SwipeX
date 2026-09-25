@@ -17,7 +17,7 @@ def test_m2_recommendations_authenticated_flow(gateway_url, check_gateway_health
     sample_resume_content = b"Senior Full Stack Software Engineer with 5+ years experience in Python, FastAPI, React, PostgreSQL, Redis, Docker."
     files = {"file": ("test_resume.txt", sample_resume_content, "text/plain")}
     upload_res = httpx.post(
-        f"{gateway_url}/api/v1/resume/upload",
+        f"{gateway_url}/api/v1/resumes/upload",
         files=files,
         headers=test_job_seeker["headers"],
         timeout=10.0

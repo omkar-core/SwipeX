@@ -34,12 +34,6 @@ SKILL_MAP = {
         "arduino"
     ],
 
-    "vlsi engineer": [
-        "verilog",
-        "vlsi",
-        "digital electronics",
-        "asic"
-    ]
 }
 
 

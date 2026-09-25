@@ -4,11 +4,13 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 
 from resume_parser import parse_resume, UnsupportedFileType
+
 from app.job_data import load_job_data, get_jobs
 from app.ats import calculate_ats_score
 from app.recommendations import get_recommendations
 from app.matching_engine import calculate_match_score
 from app.swipes import add_swipe, get_user_swipes
+from app.suggestions import generate_suggestions
 
 
 app = FastAPI(
@@ -195,226 +197,6 @@ def get_ats_score(
 
 
 # =========================================================
-# RECOMMENDATIONS - GET
-# =========================================================
-
-@app.get("/api/v1/recommendations")
-def recommendations(
-    user_id: str = "USER001"
-):
-
-    user = TEST_USERS.get(user_id)
-
-    if not user:
-
-        # Real authenticated users are identified by UUIDs and are not in
-        # the static TEST_USERS map. Fall back to the most recent uploaded
-        # resume's skills so recommendations work for any registered user.
-        if RESUME_STORE:
-
-            latest_resume_id = list(
-                RESUME_STORE.keys()
-            )[-1]
-
-            user = {
-                "user_id": user_id,
-                "skills": RESUME_STORE[
-                    latest_resume_id
-                ]["parsed_skills"],
-                "location": ""
-            }
-
-        else:
-
-            raise HTTPException(
-                status_code=404,
-                detail="User not found"
-            )
-
-    jobs = get_jobs()
-
-    swipe_history = get_user_swipes(
-        user_id
-    )
-
-    # Latest swipe action for every job
-    swipe_map = {}
-
-    for swipe in swipe_history:
-
-        swipe_map[
-            str(swipe["job_id"])
-        ] = swipe["action"]
-
-    recommendations_list = []
-
-    # Process every job
-    for _, job in jobs.iterrows():
-
-        job_dict = job.to_dict()
-
-        job_id = str(
-            job_dict["job_id"]
-        )
-
-        # -----------------------------------------
-        # Calculate base match score
-        # -----------------------------------------
-
-        score = calculate_match_score(
-            user["skills"],
-            user["location"],
-            job_dict
-        )
-
-        # -----------------------------------------
-        # Reason tags
-        # -----------------------------------------
-
-        reason_tags = []
-
-        # Required skills
-        required_skills = job_dict.get(
-            "required_skills",
-            []
-        )
-
-        if isinstance(
-            required_skills,
-            str
-        ):
-
-            required_skills = [
-                skill.strip().lower()
-                for skill in required_skills.split(",")
-                if skill.strip()
-            ]
-
-        else:
-
-            required_skills = [
-                str(skill).strip().lower()
-                for skill in required_skills
-            ]
-
-        user_skills = [
-            str(skill).strip().lower()
-            for skill in user["skills"]
-        ]
-
-        matched_skills = (
-            set(user_skills)
-            & set(required_skills)
-        )
-
-        # Skill reason
-        if matched_skills:
-
-            if len(matched_skills) >= 2:
-
-                reason_tags.append(
-                    "Strong skill match"
-                )
-
-            else:
-
-                reason_tags.append(
-                    "Matches your skills"
-                )
-
-        # -----------------------------------------
-        # Location match
-        # -----------------------------------------
-
-        job_location = str(
-            job_dict.get(
-                "location",
-                ""
-            )
-        ).strip().lower()
-
-        user_location = str(
-            user["location"]
-        ).strip().lower()
-
-        if job_location == user_location:
-
-            reason_tags.append(
-                "Location match"
-            )
-
-        # -----------------------------------------
-        # Swipe history
-        # -----------------------------------------
-
-        previous_action = swipe_map.get(
-            job_id
-        )
-
-        if previous_action == "like":
-
-            score += 10
-
-            reason_tags.append(
-                "Preferred based on swipe history"
-            )
-
-        elif previous_action == "dislike":
-
-            score -= 20
-
-            reason_tags.append(
-                "Previously disliked"
-            )
-
-        # Keep score between 0 and 100
-        score = max(
-            0,
-            min(100, score)
-        )
-
-        # -----------------------------------------
-        # Add recommendation
-        # -----------------------------------------
-
-        recommendations_list.append({
-
-            "job_id": job_id,
-
-            "job_title": str(
-                job_dict["job_title"]
-            ),
-
-            "location": str(
-                job_dict["location"]
-            ),
-
-            "match_score": round(
-                score,
-                2
-            ),
-
-            "reason_tags": reason_tags
-
-        })
-
-    # -----------------------------------------
-    # Highest score first
-    # -----------------------------------------
-
-    recommendations_list.sort(
-        key=lambda item: item["match_score"],
-        reverse=True
-    )
-
-    return {
-        "user_id": user_id,
-        "recommendations": recommendations_list,
-        "generated_by": "heuristic-v0"
-    }
-
-
-# =========================================================
 # RECOMMENDATIONS - POST
 # =========================================================
 
@@ -429,7 +211,8 @@ def recommendations_from_resume(
 
     return {
         "total_recommendations": len(result),
-        "recommendations": result
+        "recommendations": result,
+        "generated_by": "semantic-swipe-v1"
     }
 
 
@@ -500,9 +283,7 @@ def job_market():
             .head(15)
         )
 
-        result["top_skills"] = (
-            skills.to_dict()
-        )
+        result["top_skills"] = skills.to_dict()
 
     return {
         "status": "success",
@@ -649,3 +430,66 @@ def match_resume_with_job(
         "generated_by": "heuristic-v0"
     }
 
+
+# =========================================================
+# RESUME OPTIMIZATION SUGGESTIONS
+# =========================================================
+
+@app.post("/api/v1/resume/suggestions")
+def resume_suggestions(
+    resume_skills: list[str],
+    missing_skills: list[str] = [],
+    missing_keywords: list[str] = []
+):
+
+    suggestions = generate_suggestions(
+        resume_skills=resume_skills,
+        missing_skills=missing_skills,
+        missing_keywords=missing_keywords
+    )
+
+    return {
+        "resume_skills": resume_skills,
+        "missing_skills": missing_skills,
+        "missing_keywords": missing_keywords,
+        "suggestions": suggestions,
+        "generated_by": "rule-based-v1"
+    }
+
+
+# =========================================================
+# DAY 5 - PERSONALIZED RECOMMENDATIONS
+# =========================================================
+
+@app.get("/api/v1/recommendations")
+def recommendations(
+    user_id: str = "USER001"
+):
+
+    user = TEST_USERS.get(user_id)
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    recommendations_list = get_recommendations(
+        resume_skills=user["skills"],
+        user_id=user_id
+    )
+
+    return {
+        "user_id": user_id,
+
+        "total_recommendations": len(
+            recommendations_list
+        ),
+
+        "recommendations":
+            recommendations_list,
+
+        "generated_by":
+            "semantic-swipe-v1"
+    }

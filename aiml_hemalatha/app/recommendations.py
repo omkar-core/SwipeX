@@ -1,25 +1,41 @@
 from app.job_data import get_jobs
 from app.ats import calculate_ats_score
+from app.semantic_engine import calculate_semantic_similarity
+from app.swipes import get_user_swipes
 
 
-def normalize_column_name(df, old_name, new_name):
-    """Rename column if exists, for test/prod compatibility"""
-    if old_name in df.columns and new_name not in df.columns:
-        df = df.rename(columns={old_name: new_name})
-    return df
+def get_swipe_score(user_id, job_id):
+    if not user_id:
+        return 50.0
+
+    swipes = get_user_swipes(user_id)
+
+    for swipe in reversed(swipes):
+        if swipe["job_id"] == str(job_id):
+
+            if swipe["action"] == "like":
+                return 100.0
+
+            if swipe["action"] == "dislike":
+                return 0.0
+
+    return 50.0
 
 
-def get_recommendations(resume_skills, limit=10):
+def get_recommendations(
+    resume_skills,
+    resume_text="",
+    user_id=None,
+    limit=10
+):
     """
-    Generate job recommendations using
-    rule-based skill matching.
+    Generate recommendations using:
+    - skill matching
+    - semantic similarity
+    - swipe history
     """
 
     jobs = get_jobs()
-
-    # Normalize column names for test compatibility
-    jobs = normalize_column_name(jobs, "Job Title", "job_title")
-    jobs = normalize_column_name(jobs, "Location", "location")
 
     recommendations = []
 
@@ -27,32 +43,59 @@ def get_recommendations(resume_skills, limit=10):
 
         result = calculate_ats_score(
             resume_skills,
-            job.get("required_skills", [])
+            job["required_skills"]
+        )
+
+        keyword_score = result["score"]
+
+        job_text = (
+            f"Job Title: {job['job_title']}. "
+            f"Required Skills: "
+            f"{', '.join(job['required_skills'])}. "
+            f"Location: {job['location']}."
+        )
+
+        resume_text_for_similarity = (
+            resume_text
+            if resume_text
+            else f"Skills: {', '.join(resume_skills)}"
+        )
+
+        semantic_similarity = calculate_semantic_similarity(
+            resume_text_for_similarity,
+            job_text
+        )
+
+        semantic_score = semantic_similarity * 100
+
+        swipe_score = get_swipe_score(
+            user_id,
+            job["job_id"]
+        )
+
+        recommendation_score = (
+            keyword_score * 0.4
+            + semantic_score * 0.4
+            + swipe_score * 0.2
         )
 
         reason_tags = []
 
         if result["matched_skills"]:
+            reason_tags.append("Matches your skills")
 
-            if result["score"] >= 70:
+        if semantic_score >= 70:
+            reason_tags.append("Strong semantic match")
 
-                reason_tags.append(
-                    "Strong skill match"
-                )
+        if swipe_score == 100:
+            reason_tags.append("Previously liked")
 
-            else:
+        elif swipe_score == 0:
+            reason_tags.append("Previously disliked")
 
-                reason_tags.append(
-                    "Matches your skills"
-                )
+        if not reason_tags:
+            reason_tags.append("Low match")
 
-        else:
-
-            reason_tags.append(
-                "Low skill match"
-            )
-
-        # Handle salary column safely
         salary = job.get(
             "Salary",
             job.get("salary", 0)
@@ -63,28 +106,12 @@ def get_recommendations(resume_skills, limit=10):
             job.get("monthly_salary", 0)
         )
 
-        job_title = job.get(
-            "job_title",
-            job.get("Job Title", "Unknown")
-        )
-
-        location = job.get(
-            "location",
-            job.get("Location", "")
-        )
-
         recommendation = {
-
-            "job_id": str(
-                job["job_id"]
-            ),
-
-            "title": str(
-                job_title
-            ),
+            "job_id": str(job["job_id"]),
+            "title": str(job["job_title"]),
 
             "required_skills":
-                job.get("required_skills", []),
+                job["required_skills"],
 
             "matched_skills":
                 result["matched_skills"],
@@ -92,14 +119,23 @@ def get_recommendations(resume_skills, limit=10):
             "missing_skills":
                 result["missing_skills"],
 
-            "match_score":
-                result["score"],
+            "keyword_score":
+                keyword_score,
+
+            "semantic_score":
+                round(semantic_score, 2),
+
+            "swipe_score":
+                swipe_score,
+
+            "recommendation_score":
+                round(recommendation_score, 2),
 
             "reason_tags":
                 reason_tags,
 
             "location":
-                str(location),
+                str(job["location"]),
 
             "salary":
                 salary,
@@ -113,10 +149,8 @@ def get_recommendations(resume_skills, limit=10):
         )
 
     recommendations.sort(
-        key=lambda x: x["match_score"],
+        key=lambda x: x["recommendation_score"],
         reverse=True
     )
 
     return recommendations[:limit]
-
-

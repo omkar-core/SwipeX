@@ -26,9 +26,17 @@ import {
   JobStatus,
   PipelineStage,
   RecruiterAnalyticsData,
-  CandidateAnalyticsData
+  CandidateAnalyticsData,
+  Company,
+  CompanyDetail,
+  AdminDashboardData,
+  AdminUserRecord,
+  AdminRecruiterRecord,
+  AdminJobRecord,
+  AdminApplicationRecord,
+  AdminAnalyticsData
 } from '../types';
-import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME } from '../data/mockData';
+import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME, MOCK_COMPANIES } from '../data/mockData';
 
 
 // Realistic network latency simulation helper for mock mode
@@ -230,6 +238,89 @@ export class ApiService {
   }
 
   /* ==========================================================================
+     ADMIN CONTRACTS
+     ========================================================================== */
+
+  static async getAdminDashboard(): Promise<AdminDashboardData> {
+    if (API_CONFIG.USE_MOCK) {
+      return {
+        total_users: 154,
+        total_recruiters: 28,
+        total_job_seekers: 126,
+        total_jobs: MOCK_JOBS.length,
+        active_jobs: MOCK_JOBS.length,
+        total_applications: 342,
+        pending_items: 12,
+      };
+    }
+    return httpRequest<AdminDashboardData>(API_ENDPOINTS.ADMIN.DASHBOARD);
+  }
+
+  static async getAdminUsers(params: { search?: string; role?: string } = {}): Promise<AdminUserRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
+      return [
+        { user_id: user.user_id, name: user.name, email: user.email, role: user.role, status: 'Active', created_at: '2025-01-15' },
+        { user_id: 'usr_rec_001', name: 'Sarah Jenkins', email: 'sarah@techcorp.io', role: 'recruiter', status: 'Active', created_at: '2025-02-01', company_name: 'TechCorp' },
+        { user_id: 'usr_adm_001', name: 'Admin One', email: 'admin@swipex.io', role: 'admin', status: 'Active', created_at: '2025-01-01' },
+      ];
+    }
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.role) query.set('role', params.role);
+    return httpRequest<AdminUserRecord[]>(`${API_ENDPOINTS.ADMIN.USERS}?${query}`);
+  }
+
+  static async getAdminRecruiters(params: string | { search?: string } = {}): Promise<AdminRecruiterRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return [
+        { user_id: 'usr_rec_001', name: 'Sarah Jenkins', email: 'sarah@techcorp.io', role: 'recruiter', status: 'Active', created_at: '2025-02-01', company_name: 'TechCorp', designation: 'Lead Talent Partner', job_count: 4 },
+        { user_id: 'usr_rec_002', name: 'Michael Chen', email: 'mchen@innovate.ai', role: 'recruiter', status: 'Active', created_at: '2025-02-10', company_name: 'Innovate AI', designation: 'Technical Recruiter', job_count: 2 },
+      ];
+    }
+    const query = new URLSearchParams();
+    const searchVal = typeof params === 'string' ? params : params.search;
+    if (searchVal) query.set('search', searchVal);
+    return httpRequest<AdminRecruiterRecord[]>(`${API_ENDPOINTS.ADMIN.RECRUITERS}?${query}`);
+  }
+
+  static async getAdminJobs(params: { search?: string; status?: string } = {}): Promise<AdminJobRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return MOCK_JOBS.map((j) => ({
+        job_id: String(j.job_id),
+        title: j.title,
+        company: j.company,
+        location: j.location,
+        status: ((j as any).status || 'Active') as JobStatus,
+        posted_at: j.posted_at || '2025-03-01',
+        application_count: j.applicant_count || Math.floor(Math.random() * 40) + 5,
+      }));
+    }
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.status) query.set('status', params.status);
+    return httpRequest<AdminJobRecord[]>(`${API_ENDPOINTS.ADMIN.JOBS}?${query}`);
+  }
+
+  static async getAdminApplications(params: { search?: string; stage?: string } = {}): Promise<AdminApplicationRecord[]> {
+    if (API_CONFIG.USE_MOCK) return [];
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.stage) query.set('stage', params.stage);
+    return httpRequest<AdminApplicationRecord[]>(`${API_ENDPOINTS.ADMIN.APPLICATIONS}?${query}`);
+  }
+
+  static async getAdminAnalytics(): Promise<AdminAnalyticsData> {
+    if (API_CONFIG.USE_MOCK) {
+      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
+      return { user_types: { job_seekers: user.role === 'job_seeker' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
+    }
+    return httpRequest<AdminAnalyticsData>(API_ENDPOINTS.ADMIN.ANALYTICS);
+  }
+
+  /* ==========================================================================
      2. JOB & SWIPE CONTRACTS
      ========================================================================== */
 
@@ -310,6 +401,84 @@ export class ApiService {
       throw new ApiError(`Job not found: ${jobId}`, 404);
     }
     return found;
+  }
+
+  /**
+   * GET /api/v1/jobs/search?q=...
+   * Searches job listings by keyword.
+   */
+  static async searchJobs(q: string): Promise<Job[]> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<Job[]>(`${API_ENDPOINTS.JOBS.SEARCH}?q=${encodeURIComponent(q)}`, {
+        method: 'GET'
+      });
+    }
+
+    let jobs = [...MOCK_JOBS];
+    if (q && q.trim()) {
+      const term = q.toLowerCase().trim();
+      jobs = jobs.filter(j => 
+        (j.title || '').toLowerCase().includes(term) ||
+        (j.company || '').toLowerCase().includes(term) ||
+        (j.description || '').toLowerCase().includes(term) ||
+        (j.skills_required || j.skills || []).some(s => s.toLowerCase().includes(term))
+      );
+    }
+    return jobs;
+  }
+
+  /**
+   * GET /api/v1/companies
+   * Retrieves companies with optional newly_founded and industry filters.
+   */
+  static async getCompanies(params?: {
+    newly_founded?: boolean;
+    industry?: string;
+    type?: string;
+  }): Promise<Company[]> {
+    if (!API_CONFIG.USE_MOCK) {
+      const query = new URLSearchParams();
+      if (params) {
+        if (params.newly_founded !== undefined) query.append('newly_founded', String(params.newly_founded));
+        if (params.industry) query.append('industry', params.industry);
+        if (params.type) query.append('type', params.type);
+      }
+      const qs = query.toString();
+      const res = await httpRequest<any[]>(`${API_ENDPOINTS.COMPANIES.LIST}${qs ? `?${qs}` : ''}`, { method: 'GET' });
+      return (res || []).map(c => ({
+        ...c,
+        id: c.id || c.company_id || c.name,
+        company_id: c.company_id || c.id,
+      }));
+    }
+
+    await mockDelay(150);
+    let list = [...MOCK_COMPANIES];
+    if (params?.newly_founded !== undefined) {
+      list = list.filter(c => c.is_newly_founded === params.newly_founded);
+    }
+    if (params?.industry) {
+      list = list.filter(c => (c.industry || '').toLowerCase().includes(params.industry!.toLowerCase()));
+    }
+    return list;
+  }
+
+  /**
+   * GET /api/v1/companies/{company_id}
+   * Retrieves detailed company profile with active jobs.
+   */
+  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
+    if (!API_CONFIG.USE_MOCK) {
+      return httpRequest<CompanyDetail>(API_ENDPOINTS.COMPANIES.DETAIL(companyId), { method: 'GET' });
+    }
+
+    await mockDelay(120);
+    const company = MOCK_COMPANIES.find(c => c.id === companyId) || MOCK_COMPANIES[0];
+    const relatedJobs = MOCK_JOBS.filter(j => (j.company || '').toLowerCase() === company.name.toLowerCase());
+    return {
+      ...company,
+      jobs: relatedJobs
+    };
   }
 
   /**

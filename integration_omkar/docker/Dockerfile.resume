@@ -15,11 +15,13 @@ RUN pip install --no-cache-dir \
     fastapi==0.115.0 \
     uvicorn[standard]==0.30.6 \
     pandas==2.2.3 \
+    numpy>=1.26.0 \
     pdfplumber==0.11.4 \
     pydantic==2.9.2 \
     python-multipart==0.0.12 \
     python-dotenv==1.0.1
 
+COPY integration_omkar/docker/shim/ /usr/local/lib/python3.11/site-packages/
 COPY aiml_hemalatha/ /app/
 
 EXPOSE 8003

@@ -219,7 +219,7 @@ export const CompaniesScreen: React.FC = () => {
                 <p className="text-xs text-slate-500 dark:text-slate-400 italic">No open roles currently posted.</p>
               ) : (
                 <div className="space-y-3">
-                  {selectedCompany.jobs.map((job) => (
+                  {selectedCompany.jobs.map((job: any) => (
                     <div
                       key={job.job_id}
                       onClick={() => setSelectedJob(job)}

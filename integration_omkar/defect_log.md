@@ -453,6 +453,12 @@ Each entry records:
 | **DEF-021** | 2026-09-25 | integration_omkar/tests/ vs backend_mansi M3 contract | **High** | Resume upload route mismatch: tests called POST /api/v1/resume/upload (singular, M1/M2 placeholder) but M3 contract freezes POST /api/v1/resumes/upload (plural). CI: 404 on old path. | Omkar (Integration) | **FIXED** |
 | **DEF-022** | 2026-09-25 | backend_mansi / aiml_hemalatha vs M3 contract | **High** | POST /api/v1/resumes/{resume_id}/parse endpoint not yet live (404/503). Contract defined in m3-api-contracts.md but implementation not yet landed. | Mansi / Hemalatha | **OPEN - Awaiting teammate Day 3-4 impl** |
 | **DEF-023** | 2026-09-25 | backend_mansi / aiml_hemalatha vs M3 contract | **High** | POST /api/v1/ats/score endpoint not yet live (404/503 in live stack). Contract frozen but not routed or implemented. | Mansi / Hemalatha | **OPEN - Awaiting teammate Day 3-4 impl** |
+| **DEF-024** | 2026-09-28 | aiml_hemalatha/app/semantic_engine.py | **High** | Hard top-level import of `sentence_transformers` without fallback; missing in `requirements.txt` and fails on Windows MAX_PATH. | Hemalatha (AI/ML) | **OPEN - Assigned to Hemalatha** |
+| **DEF-025** | 2026-09-28 | aiml_hemalatha/app/recommendations.py | **High** | KeyError: 'job_title' when processing DataFrames with title-cased column names ('Job Title'). | Hemalatha (AI/ML) | **OPEN - Assigned to Hemalatha (XFAIL tracked)** |
+| **DEF-026** | 2026-09-28 | aiml_hemalatha/tests/test_recommendations.py | **Medium** | Formula and score assertion mismatch (asserts 100.0 vs formula 90.0). | Hemalatha (AI/ML) | **OPEN - Assigned to Hemalatha** |
+| **DEF-027** | 2026-09-28 | frontend_boomika/src/types/index.ts & api.ts | **High** | Types (Company, CompanyDetail, Admin*) removed in commit cade832 causing tsc build crash. | Boomika (Frontend) | **FIXED by Intern 5** |
+| **DEF-028** | 2026-09-28 | frontend_boomika/src/types/index.ts | **Medium** | UserRole reverted to 'candidate' | 'recruiter' missing 'job_seeker' backend enum contract. | Boomika (Frontend) | **FIXED by Intern 5** |
+| **DEF-029** | 2026-09-28 | aiml_hemalatha/app/main.py | **High** | Route mismatch: singular /resume/upload vs contract plural /resumes/upload; missing GET /resumes, POST /resumes/{id}/parse, and POST /ats/score. | Hemalatha & Mansi | **OPEN - Assigned to Teammates** |
 
 ---
 
@@ -496,13 +502,103 @@ Each entry records:
 
 ---
 
-## Open Defect Summary (M3 - as of 2026-09-25)
+### DEF-024: Missing Graceful Fallback for sentence_transformers Dependency
+- **Date Found**: 2026-09-28
+- **Owner**: Hemalatha (AI/ML)
+- **Component**: `aiml_hemalatha/app/semantic_engine.py`
+- **Severity**: **High**
+- **Priority**: **High**
+- **Problem**: `app/semantic_engine.py` performs a hard, unhandled top-level import: `from sentence_transformers import SentenceTransformer`. The dependency `sentence-transformers` is neither declared in `aiml_hemalatha/requirements.txt` nor in `integration_omkar/docker/Dockerfile.resume`. On Windows development environments, installing sentence-transformers fails with `OSError: [Errno 2]` due to MAX_PATH limits on PyTorch checkpoint files.
+- **Expected Behavior**: Per M3 SRS Section 1.5 & NFR-04, AI components must provide an offline/lightweight deterministic fallback (or rule-based heuristic) if neural models cannot be loaded, and external heavy ML libraries should be safely imported.
+- **Actual Behavior**: `ModuleNotFoundError: No module named 'sentence_transformers'` crashes all test imports of `recommendations` and `semantic_engine`.
+- **Reproduction**: Run `python -c "from app.semantic_engine import calculate_semantic_similarity"` without `sentence-transformers` installed.
+- **Required Fix**: Wrap the import in a `try...except ImportError` block in `aiml_hemalatha/app/semantic_engine.py`, falling back to TF-IDF / Jaccard similarity when the model is unavailable, or document clear installation requirements.
+- **Status**: **OPEN - Assigned to Hemalatha**
+
+---
+
+### DEF-025: KeyError 'job_title' on Capitalized DataFrame Columns
+- **Date Found**: 2026-09-28
+- **Owner**: Hemalatha (AI/ML)
+- **Component**: `aiml_hemalatha/app/recommendations.py` (Line 52)
+- **Severity**: **High**
+- **Priority**: **High**
+- **Problem**: `app/recommendations.py` accesses `job['job_title']` and `job['location']` directly with lowercase keys. When jobs are loaded from CSV/Excel datasets or mock DataFrames containing title-cased keys (`Job Title`, `Location`), it crashes with `KeyError: 'job_title'`.
+- **Expected Behavior**: Robust column normalization or safe access: `job.get('job_title') or job.get('Job Title') or ''`.
+- **Actual Behavior**: Unhandled `KeyError: 'job_title'` aborts recommendation generation.
+- **Reproduction**: Run `pytest integration_omkar/tests/unit/test_aiml_fixes.py::test_column_name_compatibility` (currently marked XFAIL).
+- **Required Fix**: Update `aiml_hemalatha/app/recommendations.py` line 52 to safely access both casing conventions: `job.get('job_title', job.get('Job Title', ''))`.
+- **Status**: **OPEN - Assigned to Hemalatha (Tracked with XFAIL)**
+
+---
+
+### DEF-026: Mathematical Inconsistency in test_recommendations.py
+- **Date Found**: 2026-09-28
+- **Owner**: Hemalatha (AI/ML)
+- **Component**: `aiml_hemalatha/tests/test_recommendations.py`
+- **Severity**: **Medium**
+- **Priority**: **Medium**
+- **Problem**: Test assertion in `test_recommendations_rank_highest_match_first` expects `result[0]["match_score"] == 100.0`, but the formula in `recommendations.py` computes `keyword_score * 0.4 + semantic_score * 0.4 + swipe_score * 0.2`. With neutral swipe score (50.0), the maximum possible score without positive swipe history is `40 + 40 + 10 = 90.0`, causing an immediate assertion failure.
+- **Expected Behavior**: Test fixtures should seed positive swipe history (`swipe_score == 100`) or adjust assertion to expect `90.0`.
+- **Actual Behavior**: `AssertionError: assert 90.0 == 100.0`.
+- **Reproduction**: Run `pytest aiml_hemalatha/tests/test_recommendations.py` with mock semantic engine.
+- **Required Fix**: Update test assertion or recommendations formula so test expectations match algorithm arithmetic.
+- **Status**: **OPEN - Assigned to Hemalatha**
+
+---
+
+### DEF-027: Frontend TypeScript Compilation Broken by Missing Contract Types
+- **Date Found**: 2026-09-28
+- **Owner**: Boomika (Frontend) / Fixed by Intern 5
+- **Component**: `frontend_boomika/src/types/index.ts` & `frontend_boomika/src/services/api.ts`
+- **Severity**: **High** (Blocks `npm run build` and CI frontend job)
+- **Priority**: **High**
+- **Problem**: Commit `cade832` stripped `Company`, `CompanyDetail`, and `Admin*` type definitions from `types/index.ts` and their corresponding API methods from `api.ts`, causing 8 TypeScript compiler errors during `npm run build`.
+- **Expected Behavior**: Frontend builds cleanly with zero TypeScript errors.
+- **Actual Behavior**: `tsc` failed with errors TS2304 ('Company', 'CompanyDetail' not found) and TS2339 (`getCompanies`, `getCompanyById` do not exist on `ApiService`).
+- **Reproduction**: `cd frontend_boomika && npm run build`.
+- **Resolution**: Intern 5 applied minimal contract type definitions in `frontend_boomika/src/types/index.ts` and restored API stub methods in `frontend_boomika/src/services/api.ts`. Verified `npm run build` exits 0 (2266 modules transformed).
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+### DEF-028: Frontend UserRole Missing Backend 'job_seeker' Contract
+- **Date Found**: 2026-09-28
+- **Owner**: Boomika (Frontend) / Fixed by Intern 5
+- **Component**: `frontend_boomika/src/types/index.ts`
+- **Severity**: **Medium**
+- **Priority**: **High**
+- **Problem**: Commit `cade832` redefined `UserRole` as `'candidate' | 'recruiter'`, removing `'job_seeker'` which is the canonical enum value enforced by the backend auth database schema (`app/models.py`).
+- **Expected Behavior**: `UserRole` includes `'job_seeker'` alongside `'candidate'` and `'recruiter'`.
+- **Actual Behavior**: Type mismatch when handling backend auth tokens and registration payloads.
+- **Resolution**: Updated `UserRole = 'candidate' | 'job_seeker' | 'recruiter';` in `types/index.ts`.
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+### DEF-029: AIML Route Mismatch Against Frozen M3 API Contract
+- **Date Found**: 2026-09-28
+- **Owner**: Hemalatha (AI/ML) & Mansi (Backend Gateway)
+- **Component**: `aiml_hemalatha/app/main.py` vs `backend_mansi/docs/m3-api-contracts.md`
+- **Severity**: **High**
+- **Priority**: **High**
+- **Problem**: `aiml_hemalatha/app/main.py` exposes singular route `POST /api/v1/resume/upload` instead of frozen contract `POST /api/v1/resumes/upload`. Missing `GET /api/v1/resumes` (list versions) and missing `POST /api/v1/resumes/{id}/parse`. Uses `GET /api/v1/resume/{id}/ats-score` instead of `POST /api/v1/ats/score`.
+- **Expected Behavior**: Endpoints match Section 11.2 M3 Contract Freeze (`/api/v1/resumes/upload`, `GET /api/v1/resumes`, `POST /api/v1/resumes/{id}/parse`, `POST /api/v1/ats/score`).
+- **Actual Behavior**: Live gateway forwarding yields HTTP 404/503.
+- **Reproduction**: Send HTTP requests to gateway routes.
+- **Required Fix**: Update FastAPI route paths in `aiml_hemalatha/app/main.py` and ensure `backend_mansi/app/gateway.py` proxies to matching upstream paths.
+- **Status**: **OPEN - Assigned to Teammates (Hemalatha & Mansi)**
+
+---
+
+## Open Defect Summary (M3 - as of 2026-09-28)
 
 | Count | Severity | Owner | Items |
 |---|---|---|---|
-| 0 | **HIGH OPEN (Intern 5)** | Omkar | DEF-021 FIXED |
-| 2 | **HIGH OPEN (Teammates)** | Mansi + Hemalatha | DEF-022 (parse endpoint), DEF-023 (ATS endpoint) not yet live |
-| 0 | **MEDIUM OPEN** | - | None |
+| 0 | **HIGH OPEN (Intern 5)** | Omkar | DEF-021, DEF-027, DEF-028 FIXED |
+| 4 | **HIGH OPEN (Teammates)** | Mansi + Hemalatha | DEF-022 (parse route), DEF-023 (ATS score route), DEF-024 (sentence_transformers), DEF-025 (DataFrame key KeyError), DEF-029 (route pluralization) |
+| 1 | **MEDIUM OPEN (Teammates)** | Hemalatha | DEF-026 (test assertion math mismatch) |
 | 0 | **LOW OPEN** | - | None |
 
-**M3 Day 3 Integration Status**: DEF-021 is FIXED AND VERIFIED. DEF-022 and DEF-023 are reported-not-fixed (per scope rules - Intern 5 does not modify teammate code). Live functional tests (D3-FN-07, D3-FN-09) soft-skip when endpoints are not live, preventing false CI failures while preserving full assertion bodies.
+**M3 Integration Status**: Intern 5 integration fixes (DEF-021, DEF-027, DEF-028) are verified and passing. Teammate internal implementation defects (DEF-022 to DEF-026, DEF-029) are logged with full reproduction steps and assigned to respective owners without modifying teammate feature logic.
+

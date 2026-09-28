@@ -1,15 +1,24 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '../App';
 import { API_CONFIG } from '../config/api';
 import { User } from '../types';
+import { ApiService } from '../services/api';
 
 describe('Role-Based Access Control (RBAC) & Route Protection', () => {
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('swipex_onboarded', 'true'); // bypass onboarding modal in tests
+    vi.spyOn(ApiService, 'getMe').mockImplementation(async (_token?: string) => {
+      const userStr = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        return { user_id: u.user_id, name: u.name, role: u.role, user: u };
+      }
+      throw new Error('Unauthorized');
+    });
   });
 
   it('unauthenticated users are blocked by auth guard and redirected to LoginScreen', async () => {

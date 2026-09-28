@@ -1,0 +1,830 @@
+=== PAGE 1 ===
+SwipeX — Milestone 3 SRS
+SOFTWARE REQUIREMENTS SPECIFICATION
+Milestone 3 — AI Resume Analysis & Recommendations
+SwipeX
+Swipe-Based Intelligent Job Discovery and Career Assistance Platform
+Field Detail
+Document Type Software Requirements Specification (SRS) — Milestone 3
+Milestone Duration 7 Working Days
+Team Size 5 Interns, working in parallel across five domains
+Team Composition Frontend & User Experience; Backend & Identity Management; Job & Data Intelligence;
+AI/ML Career Intelligence; Platform, Testing & Deployment
+Builds On Milestone 1 (Auth/RBAC, finalized schema, ATS heuristic stub) and Milestone 2
+(Job/Swipe/Search/Company services, heuristic Matching Engine)
+Deployment Scope Excluded from Milestone 3. Production deployment occurs only after Milestone 4.
+Tooling Policy Every tool used must be free / open-source — no paid subscriptions required anywhere in
+this milestone
+Primary Reference SwipeX Project Charter (provided PDF), Sections 3–5 (Architecture Diagram; Module 6 — AI
+Resume Analyzer & ATS Scoring; Module 7 — Personalized Job Recommendation System;
+Milestone 3: Week 5 & 6), and the SwipeX Milestone 1 & 2 SRS baselines
+Prepared For Educator / Mentor supervising the intern cohort
+1. Introduction
+1.1 Purpose
+This Software Requirements Specification (SRS) defines the scope, tasks, responsibilities, dependencies, and
+integration requirements for Milestone 3 of the SwipeX platform. It builds directly on the Milestone 1 and Milestone 2
+increments — working Authentication/RBAC, the finalized database schema, the live Job/Swipe/Search/Company
+services, and the heuristic ATS and Matching Engine stubs — and translates the project charter's AI Resume Analyzer
+& ATS Scoring and Personalized Job Recommendation System modules into a coordinated, day-wise execution plan
+for five interns working in parallel, so that their individual deliverables converge into a single, functioning system
+increment by the end of Day 7.
+1.2 Scope of Milestone 3
+Milestone 3 covers AI Resume Analysis & Recommendations. By the end of Day 7 the team must deliver a working
+increment consisting of: a Resume Service supporting resume upload, storage, and multiple versions; a text-
+extraction and skill-extraction pipeline that parses uploaded resumes (PDF/DOCX); a real ATS Scoring engine that
+blends keyword-match percentage with semantic similarity to compute a resume-job compatibility score, and that
+identifies missing skills and missing keywords when the score falls below the 80% threshold defined in the project
+charter; an AI-generated resume-optimization-suggestions module; an upgraded Recommendation/Matching Engine
+that replaces the Milestone 2 heuristic with semantic-similarity- and ATS-aware scoring; and a connected frontend
+that lets a Job Seeker upload a resume, see their ATS score with missing skills/keywords highlighted, read AI-
+generated suggestions, and see AI match percentages on recommended jobs — all validated inside the shared
+local/dev Docker Compose environment.
+Page 1
+
+=== PAGE 2 ===
+SwipeX — Milestone 3 SRS
+Explicitly out of scope for Milestone 3: notifications/alerts, application-tracking dashboards, and analytics/hiring-trend
+visualization (Milestone 4 territory per the project charter's Modules 8–10); and production/cloud deployment, which
+remains reserved for after Milestone 4.
+1.3 Definitions & Abbreviations
+• SRS — Software Requirements Specification
+• RBAC — Role-Based Access Control
+• JWT — JSON Web Token, used for stateless authentication
+• API Gateway — Single entry point that routes requests to backend services
+• ATS Score — The percentage compatibility between a resume and a job, blending keyword match and semantic
+similarity
+• Skill Extraction / NER — Named-Entity Recognition used to pull skills, roles, and experience out of raw resume
+text
+• Semantic Similarity — A vector-embedding-based measure of how closely resume content matches a job
+description in meaning, not just exact keywords
+• Vector Database — A database (e.g., ChromaDB) that stores text embeddings and supports similarity search, used
+here for resume-job semantic matching
+• LLM — Large Language Model, used in this milestone to generate human-readable resume-optimization
+suggestions
+• M1–M4 — Milestone 1 through Milestone 4, as defined in the project charter
+• Intern 1–5 — Shorthand for the five domain owners defined in Section 4
+1.4 Reference Documents
+• SwipeX: Swipe-Based Intelligent Job Discovery and Career Assistance Platform — Project Charter (source PDF),
+Section 3 (Architecture Diagram, AI/NLP Services and Database & Storage layers)
+• SwipeX Project Charter (source PDF), Section 4, Module 6 — AI Resume Analyzer & ATS Scoring, and Module 7 —
+Personalized Job Recommendation System
+• SwipeX Project Charter (source PDF), Section 5 — Milestone 3: Week 5 & 6 (AI Resume Analysis &
+Recommendations)
+• SwipeX Milestone 1 SRS and Milestone 2 SRS — baseline architecture, schema, Auth/RBAC,
+Job/Swipe/Search/Company services, and the heuristic ATS/Matching stubs this milestone replaces
+• Prior mentor/team discussions establishing the five-domain team split and the deployment exclusion through
+Milestone 4
+1.5 Golden Rule for This Milestone
+Every tool used in Milestone 3 must be free. Text extraction, skill/keyword extraction, embeddings, and the vector
+database are all done with free, open-source libraries. Where the project charter names OpenAI API for the LLM
+Service, the team treats this as optional: if free trial credits are available they may be used for the AI-suggestions
+feature, but the module must degrade gracefully to a fully free, rule-based suggestion generator so that no paid
+subscription is ever required to complete or demo this milestone.
+2. Free Tools Checklist
+Before Day 1 begins, make sure every intern has access to the free tools below that are relevant to their domain, in
+addition to the Milestone 1 and Milestone 2 toolset already in use. No paid tool is required anywhere in this
+milestone.
+Page 2
+
+=== PAGE 3 ===
+SwipeX — Milestone 3 SRS
+What It's Needed For Free Tool Option(s)
+Writing code VS Code (completely free)
+Saving & sharing code Git + GitHub (free for public/private small repos)
+Testing APIs manually Postman (free plan) or the Thunder Client extension in VS
+Code (free)
+Backend framework Python + Django REST Framework (free, open-source) or
+FastAPI (free)
+Frontend framework React.js (free, open-source) with Tailwind CSS (free)
+Resume file parsing (PDF/DOCX → text) pdfplumber / PyPDF2 and python-docx (all free, open-source)
+Resume file storage (dev) MinIO (free, open-source, S3-compatible) or local disk storage
+— no paid cloud storage required
+Skill/keyword extraction (NLP) spaCy (free, open-source) with a custom skills
+dictionary/pattern list
+Semantic similarity / embeddings sentence-transformers (free, open-source pretrained models)
+Vector database for semantic matching ChromaDB (free, open-source) — used instead of a paid
+managed vector DB such as Pinecone
+AI-generated suggestions (optional LLM layer) OpenAI API free trial credits if available; otherwise a fully free
+rule-based/template suggestion generator (no paid
+dependency required)
+Database PostgreSQL (free, open-source) for structured data; Redis
+(free, open-source) for caching
+Automated backend tests pytest (Python, free) or Jest (Node.js, free)
+Automated local integration tests Docker Compose (free) running the whole stack on a laptop
+— no live server needed
+CI checks on every PR (lint/build/test only) GitHub Actions (free tier for public/small private repos) — no
+deployment stage configured
+Code quality / linting ESLint (frontend, free), Flake8 / Black (backend, free)
+API documentation Swagger UI / OpenAPI (free, built into DRF/FastAPI)
+Diagrams (architecture, ER diagram) draw.io / dbdiagram.io (free)
+Defect tracking / task board GitHub Issues & Projects (free) or Trello (free tier)
+None of the tools above require a paid plan to complete Milestone 3. If a paid tier is ever tempting (e.g., a managed
+vector DB or a paid LLM plan), the local/free alternative listed here is sufficient for this milestone's scope.
+3. Overall Introduction
+Milestone 3 fills in the AI/NLP Services layer of the project charter's architecture diagram — Text Extraction &
+Preprocessing, Skill Extraction (NLP), Keyword & ATS Analysis, Semantic Similarity & Matching, and an LLM Service for
+suggestion generation — alongside the Resume Service and ATS Scoring Service on the backend side, and the Vector
+Database in the Database & Storage layer. Where Milestone 1 shipped a heuristic ATS stub and Milestone 2 shipped a
+rule-based Matching Engine so the rest of the team could integrate early, Milestone 3 replaces both with the real
+implementations: actual resume parsing, actual keyword-and-semantic ATS scoring, actual missing-skill/keyword
+detection, actual AI-generated improvement suggestions, and a Recommendation Engine that blends semantic
+similarity with the Milestone 2 swipe-history signal.
+Page 3
+
+=== PAGE 4 ===
+SwipeX — Milestone 3 SRS
+By the end of this milestone, a Job Seeker will be able to log in (Milestone 1), upload a resume, see it parsed into
+structured skills, view an ATS compatibility score against any job with missing skills/keywords called out, read AI-
+generated suggestions for closing that gap, and see their swipe-deck recommendations (Milestone 2) re-ranked using
+real semantic matching instead of the earlier heuristic — all against live backend data running inside the shared
+Docker Compose environment.
+4. Team Structure & Domain Ownership
+Intern Domain Primary Architecture Ownership (Milestone 3)
+Intern 1 Frontend & User Experience Resume upload UI, ATS score dashboard, missing skills/keywords
+display, AI-suggestions panel, AI match % on job cards
+Intern 2 Backend & Identity Management Resume Service APIs, ATS Scoring Service API, Recommendation
+API upgrade, Gateway extension, RBAC on new endpoints
+Intern 3 Job & Data Intelligence Resume/Skill schema extension, resume file storage, Job required-
+skills/keywords data, resume-job skill query layer
+Intern 4 AI/ML Career Intelligence Text extraction, skill extraction (NLP), ATS scoring engine (keyword
++ semantic), AI-suggestions module, Recommendation Engine
+upgrade
+Intern 5 Platform, Testing & Deployment CI/CD extension, docker-compose update (storage + vector DB),
+test automation with mocked AI/vector calls, defect tracking,
+integration validation
+Deployment (packaging for production, cloud release, AWS/Azure hosting) remains excluded from Intern 5's scope in
+this milestone. It is scheduled after Milestone 4 is complete.
+5. Milestone 3 Objectives
+• Extend the database schema to support resumes, resume versions, extracted skills, and job required-
+skills/keywords.
+• Implement the Resume Service: upload, storage, versioning, and retrieval of resumes.
+• Implement a text-extraction and NLP skill-extraction pipeline that parses uploaded resumes into structured,
+queryable data.
+• Implement the ATS Scoring engine: a blended keyword-match and semantic-similarity score between a resume
+and a job, with missing-skill and missing-keyword detection when the score is below 80%.
+• Implement an AI-generated resume-optimization-suggestions module, with a fully free fallback if no LLM
+budget/credits are available.
+• Upgrade the Recommendation/Matching Engine to use semantic similarity (via a free, open-source vector
+database) blended with the Milestone 2 swipe-history signal.
+• Deliver a connected frontend: resume upload with version management, an ATS score dashboard with missing
+skills/keywords highlighted, an AI-suggestions panel, and AI match percentages surfaced on recommended jobs.
+• Validate the full increment through integration testing, automated checks (with AI/vector calls mocked for
+determinism and cost control), and a defect-tracked QA cycle — without production deployment.
+6. Functional Requirements — Milestone 3 Scope
+Req ID Requirement Owner Priority
+FR-01 Users can upload resumes and manage multiple versions Intern 1 / 2 / 3 High
+FR-02 System extracts text from uploaded resumes (PDF/DOCX) and parses Intern 4 High
+skills/experience
+Page 4
+
+=== PAGE 5 ===
+SwipeX — Milestone 3 SRS
+Req ID Requirement Owner Priority
+FR-03 System computes a blended (keyword + semantic) ATS match score Intern 4 / Intern 2 High
+between a resume and a job
+FR-04 System identifies and returns missing skills and missing keywords when Intern 4 High
+the ATS score is below 80%
+FR-05 System generates AI-powered resume-optimization suggestions, with a Intern 4 Medium
+free fallback generator
+FR-06 The Recommendation/Matching Engine is upgraded to use semantic Intern 4 High
+similarity and ATS-aware scoring instead of the Milestone 2 heuristic
+alone
+FR-07 The frontend supports resume upload, shows parsed skills, and displays Intern 1 High
+the ATS score with missing skills/keywords
+FR-08 The frontend displays AI-generated resume-optimization suggestions and Intern 1 Medium
+AI match percentages on job cards
+FR-09 RBAC restricts resume upload, ATS scoring, and suggestion actions to the Intern 2 High
+Job Seeker role
+FR-10 All Milestone 3 services run together in the local Docker Compose Intern 5 High
+environment and pass CI checks, with AI/vector-DB calls mocked in
+automated tests
+7. Cross-Team Dependency Matrix
+This matrix makes explicit which artifact each domain must hand off, to whom, and by which day, so that no intern is
+idle or blocked waiting on an undefined interface.
+Consumer Depends On Artifact Needed Needed By
+Intern 2 Intern 3 Extended Resume/Skill schema + file storage plan Day 2
+Intern 4 Intern 3 Resume/Job skill schema + structured job keyword data Day 1–2
+Intern 1 Intern 2 Live resume upload/list APIs Day 3
+Intern 2 Intern 4 Text-extraction & skill-extraction module Day 3
+Intern 2 Intern 4 ATS scoring function (keyword + semantic) Day 4
+Intern 1 Intern 2 Live ATS scoring API Day 4
+Intern 1 Intern 2 / Intern 4 AI-suggestions API + upgraded recommendation feed Day 5
+Intern 5 Intern 1 / 2 / 3 / 4 Dev-deployed endpoints/UI for each service as they land Days 2–5
+Page 5
+
+=== PAGE 6 ===
+SwipeX — Milestone 3 SRS
+8. Master 7-Day Execution Timeline
+All five interns work in parallel every day, each building directly on the previous day's output so no one is left waiting idle. The table below is the single-glance view;
+Section 9 gives the full detail (task/output/dependency/hand-off) per intern.
+Day Intern 1 Frontend Intern 2 Backend/Identity Intern 3 Job & Data Intern 4 AI/ML Intern 5 QA/DevOps
+1 Wireframes: resume upload, Resume/ATS/Recommendation Resume/Skill schema extension AI/NLP stack finalized + ATS CI/docker-compose extension +
+ATS dashboard API contracts + Gateway plan + storage plan scoring design M3 test/mocking plan
+2 Resume upload UI + ATS POST /resumes/upload, GET Resume/Skill tables migrated + Text-extraction + skill-extraction Test cases + automated suite
+dashboard scaffold (mock data) /resumes live file storage live module built scaffold
+3 Resume UI wired to live Resume parse-trigger endpoint Job required-skills/keywords ATS scoring engine v1 (keyword + Functional tests on Resume
+upload/list APIs wired to Intern 4's module data added missing-skill diff) upload/parse; CI runs suite
+4 ATS score view wired to live POST /ats/score live + RBAC + Resume-job skill query Semantic similarity (embeddings + Integration round 1 across
+scoring API Gateway registration optimization ChromaDB) blended into ATS Resume+ATS+Frontend
+score
+5 AI-suggestions panel + AI match AI-suggestions API + upgraded Support integration + AI-suggestions module + Full M3 integration test cycle
+% on job cards Recommendation route live backup/restore update Recommendation Engine upgrade
+6 UI polish, responsiveness, End-to-end backend integration + Unit tests + query optimization Unit tests + accuracy check on Regression testing + code-
+defect fixes Swagger docs + defect fixes sample resumes quality report
+7 Final UI fixes + demo Code freeze + sign-off summary Final validation + M4 handoff Final review + M4 handoff doc Final QA sign-off report + M3
+walkthrough prep notes test summary
+Page 6
+
+=== PAGE 7 ===
+SwipeX — Milestone 3 SRS
+9. Detailed Intern-Wise Task Breakdown
+Each table below lists, for every day, the task, the concrete expected output, what the intern depends on to start that
+task, and what they hand off to the rest of the team. Every day's task is designed to produce a usable artifact for at
+least one other intern, so no one is left without work while waiting on a dependency.
+9.1 Intern 1 — Frontend & User Experience
+Expected Output /
+Day Task Description Depends On Provides To
+Deliverable
+1 Review Intern 2's draft Wireframes for resume Intern 2's draft API Self (Day 2 build)
+Resume/ATS/Recommendation API upload, ATS dashboard, and contracts; Intern
+contracts and Intern 3's schema notes; suggestions panel 3's schema notes
+produce wireframes for the resume documented
+upload flow (multi-version), the ATS score
+dashboard, the AI-suggestions panel, and
+the AI match % badge on job cards.
+2 Build the Resume Upload component Resume upload UI + ATS Own wireframes Self (Day 3 live
+(drag-drop, version list) against mocked dashboard scaffolded on integration)
+data; scaffold the ATS Score Dashboard UI mock data
+(score gauge, missing-skills list, missing-
+keywords list, suggestions placeholder).
+3 Wire the Resume Upload UI to Intern 2's Resume upload/version UI Intern 2's Resume Intern 5 (upload-
+live upload/list APIs; show a preview of functioning against live APIs Service APIs flow test target)
+parsed skills once Intern 4's extraction
+pipeline returns them.
+4 Wire the ATS Score Dashboard to Intern ATS score dashboard Intern 2's ATS Intern 5 (ATS
+2's live /ats/score API; render the score, functioning against live Scoring API dashboard test
+missing skills, and missing keywords for a scoring API target)
+selected resume/job pair.
+5 Wire the AI-suggestions panel to the live AI-suggestions panel live; AI Intern 2's AI- Intern 5 (full UI
+suggestions endpoint; add an AI match % match % visible on job cards suggestions API; test target)
+badge to job cards in the Milestone 2 Intern 4's
+swipe deck, sourced from the upgraded upgraded
+Recommendation API. Recommendation
+Engine
+6 UI polish across resume upload, ATS Stable, tested frontend build Intern 5's defect Intern 5
+dashboard, and suggestions panel; log (regression build)
+responsiveness fixes; empty-state and
+error handling; fix defects reported by QA.
+7 Final UI fixes from QA feedback; rehearse Demo-ready frontend + Passed regression Milestone 3 demo
+the Milestone 3 demo walkthrough module documentation
+(upload resume → ATS score & missing
+skills → AI suggestions → AI-matched
+recommendations); document frontend
+module notes.
+Page 7
+
+=== PAGE 8 ===
+SwipeX — Milestone 3 SRS
+9.2 Intern 2 — Backend & Identity Management
+Expected Output /
+Day Task Description Depends On Provides To
+Deliverable
+1 Draft the OpenAPI contract for the Draft OpenAPI contracts for Intern 3's schema Intern 1 & Intern
+Resume Service (upload, list, get Resume/ATS/Recommendation draft 4 (contracts to
+version), the ATS Scoring Service (POST endpoints; Gateway routing build against)
+/ats/score), and the AI- plan updated
+suggestions/Recommendation upgrade;
+extend the API Gateway routing plan.
+2 Implement POST Working Resume upload & list Intern 3's Intern 1 (live data
+/api/v1/resumes/upload (file handling, endpoints, RBAC-protected migrated schema to build against),
+versioning) and GET /api/v1/resumes (list and registered and storage layer; Intern 4 (resumes
+versions) backed by Intern 3's schema Intern 5's updated to parse), Intern 5
+and file storage; register the new routes dev environment (test target)
+with RBAC restricting uploads to the Job
+Seeker role.
+3 Implement a resume-parse-trigger Working resume parse-trigger Intern 4's Intern 1 (parsed-
+endpoint (POST endpoint, storing extracted extraction skills preview),
+/api/v1/resumes/{id}/parse) that calls data module; Intern 3's Intern 5 (test
+Intern 4's text/skill-extraction module schema target)
+and persists parsed_text and
+extracted_skills back through Intern 3's
+schema.
+4 Implement POST /api/v1/ats/score Working ATS scoring endpoint, Intern 4's ATS Intern 1 (ATS
+(resume_id, job_id) → match_score, RBAC-protected and registered scoring engine dashboard),
+missing_keywords[], missing_skills[], Intern 5
+calling Intern 4's ATS scoring engine; (integration round
+register the ATS Scoring Service behind 1)
+the Gateway with RBAC.
+5 Implement the AI-suggestions endpoint AI-suggestions endpoint live; Intern 4's Intern 1 & Intern
+(or extend /ats/score) returning resume- Recommendation Engine suggestions 5 (single
+optimization suggestions; upgrade the upgraded and integrated module and integrated
+Recommendation route to call Intern 4's upgraded backend to
+semantic-similarity-blended scoring; Recommendation consume/test)
+integrate all Milestone 3 services fully Engine
+behind the Gateway.
+6 Run an end-to-end backend integration Stable integrated backend; Intern 5's defect Intern 5 (fixed
+pass; triage and fix defects raised by QA; published API docs log build for
+finalize Swagger/OpenAPI regression)
+documentation for all Milestone 3
+endpoints.
+7 Code freeze for the Milestone 3 backend; Backend Milestone 3 sign-off Passed QA Milestone 3 demo
+support the final demo; write a backend report regression / mentor review
+architecture & integration summary for
+sign-off.
+Page 8
+
+=== PAGE 9 ===
+SwipeX — Milestone 3 SRS
+9.3 Intern 3 — Job & Data Intelligence
+Expected Output /
+Day Task Description Depends On Provides To
+Deliverable
+1 Design the extended schema for Resume, Extended schema design + Intern 2's Intern 2 (schema
+ResumeVersion, ResumeSkill, and Job file storage plan Milestone 1/2 to build APIs
+required-skills/keywords; plan the resume documented schema baseline against), Intern 4
+file storage approach (MinIO or local disk (fields for
+for dev) and how file metadata links to the extraction/scoring)
+database records.
+2 Run migrations for the Resume/Skill Migrated schema; working Own schema Intern 2 (storage
+tables; stand up the file storage layer resume file storage design; Intern 5's to build APIs
+(MinIO/local disk) and confirm the storage container against)
+backend can read/write resume files.
+3 Add structured required_skills and Job table extended with Own schema; Intern 4 (data to
+keywords fields to the Job table required_skills/keywords, Milestone 2 seed score against)
+(extending the Milestone 2 catalog) so ATS backfilled for seed data dataset
+scoring has something concrete to
+compare resumes against; backfill this
+data for the existing seeded jobs.
+4 Optimize resume-job skill-matching Optimized resume-job query Intern 2 & Intern Intern 2 (query
+queries flagged by Intern 2/Intern 4; add layer; default-version logic 4's usage patterns support), Intern 1
+an active/default-version flag and query (correct default
+helpers for ResumeVersion. resume shown)
+5 Support the full cross-team integration Verified data layer under Intern 2's gateway Intern 5 (stable
+session; validate resume/skill data integration load; updated integration data layer for
+integrity; update the DB backup/restore backup/restore script integration tests)
+script to cover resume metadata and the
+new tables.
+6 Write unit tests for the resume/skill Tested, optimized data Intern 5's defect Intern 5
+repository layer; optimize any slow service log (regression build)
+queries flagged during integration testing;
+fix defects from QA.
+7 Final validation of the data module; Module sign-off + Milestone Passed regression Milestone 3 demo
+finalize schema documentation and data 4 handoff notes
+dictionary updates; write handoff notes
+for Milestone 4 (what
+analytics/notifications will need from
+resume and ATS data).
+Page 9
+
+=== PAGE 10 ===
+SwipeX — Milestone 3 SRS
+9.4 Intern 4 — AI/ML Career Intelligence
+Expected Output /
+Day Task Description Depends On Provides To
+Deliverable
+1 Finalize the AI/NLP stack for the real AI/NLP stack finalized; ATS Intern 3's schema Self (Day 2 build)
+implementation (pdfplumber/python-docx scoring design documented draft
+for extraction, spaCy for skill/entity
+recognition, sentence-transformers for
+embeddings, ChromaDB for vector
+storage, an optional free-tier/fallback LLM
+layer for suggestions); design the blended
+ATS scoring formula (keyword-match % +
+semantic similarity).
+2 Build the text-extraction module Working text-extraction and Intern 3's schema Intern 2 (module
+(PDF/DOCX → clean text) and the skill- skill-extraction modules for extracted fields to call from the
+extraction module (spaCy NER + a curated parse-trigger
+skills dictionary/pattern list). endpoint)
+3 Build the ATS Scoring engine v1: compute ATS scoring engine v1 Intern 3's job Intern 2 (function
+keyword-match percentage and detect (keyword-based) producing a required- to call from
+missing skills/keywords by diffing score and a missing-items list skills/keywords /ats/score)
+extracted resume skills against Intern 3's data
+job required_skills/keywords.
+4 Add semantic-similarity scoring: generate Blended (keyword + Own ATS scoring Intern 2 (blended
+embeddings for resumes and jobs with semantic) ATS score; job engine v1 scoring function)
+sentence-transformers, store job embeddings stored in
+embeddings in ChromaDB, and blend the ChromaDB
+similarity score into the ATS score v1 for a
+final blended score.
+5 Build the AI-generated resume- AI-suggestions module live; Own Intern 1
+optimization-suggestions module (LLM- Recommendation Engine ATS/embedding (suggestions & AI
+based where free credits are available, upgraded pipeline; Intern 2's match % display),
+with a fully free rule-based/template Swipe API Intern 2
+fallback); upgrade the Recommendation (Milestone 2) (integration)
+Engine to blend semantic similarity with
+the Milestone 2 swipe-history heuristic;
+document the methodology.
+6 Write unit tests for the extraction, scoring, Tested modules; accuracy Intern 5's defect Intern 5
+and suggestion modules using fixed spot-check documented log (regression build)
+sample resumes/jobs (no live external
+calls); spot-check scoring accuracy against
+a small hand-labeled sample set; fix
+defects surfaced during QA's integration
+cycle.
+7 Final review of the AI Resume Analyzer, Module sign-off + Milestone Passed regression Milestone 3 demo
+ATS Scoring, and Recommendation 4 handoff document
+modules; document accuracy findings,
+known limitations, and the handoff plan
+for Milestone 4 (what
+analytics/notifications will consume from
+these modules).
+Page 10
+
+=== PAGE 11 ===
+SwipeX — Milestone 3 SRS
+9.5 Intern 5 — Platform, Testing & Deployment
+Scope note: Intern 5's Milestone 3 work remains limited to QA, integration validation, code-quality tooling, test
+automation, and defect tracking, plus updates to the local Docker Compose environment (including the file-storage
+and vector-DB containers). No production packaging or deployment activity is performed in Milestone 3; that work
+resumes only after Milestone 4.
+Expected Output /
+Day Task Description Depends On Provides To
+Deliverable
+1 Extend CI to cover the new CI/docker-compose updated Intern 2's service All interns
+Resume/ATS/AI- for Milestone 3 scope; folder structure; (updated shared
+suggestions/Recommendation service AI/vector-DB test-mocking Intern 4's stack dev environment)
+folders; extend docker-compose.dev.yml plan documented decisions
+to add file storage (MinIO) and the vector
+database (ChromaDB); plan how
+AI/vector-DB calls will be mocked in
+automated tests to keep CI free, fast, and
+deterministic.
+2 Write test cases for Resume upload/list Test case document; Intern 2's draft API Self (Day 3
+endpoints; scaffold an automated test automated suite scaffolded contracts execution)
+suite (pytest/Postman) with mocked file for Resume Service
+storage; confirm CI runs build/lint on the
+new service code.
+3 Execute functional tests against the live Day-3 test execution report; Intern 2's live Intern 2 & 4
+Resume upload and parse-trigger logged defects; CI running endpoints (defect list to fix)
+endpoints as they land; log defects with the new suite
+severity/priority; extend CI to run the new
+automated suite on every PR.
+4 Run integration round 1 across Resume Integration round 1 report; Intern 1/2/3/4's All interns (defect
+upload/parse + ATS scoring + Frontend prioritized defect list Day-4 backlog for Day 5)
+inside docker-compose.dev.yml; log and endpoints/UI
+prioritize defects.
+5 Run the first full Milestone 3 integration Full integration test report; All four other All interns (defect
+test cycle end-to-end (resume upload → prioritized defect list interns' Day-5 backlog for Day 6)
+parse → ATS score → AI suggestions → integrated build
+upgraded recommendation feed); verify
+RBAC behavior; log and prioritize defects
+for Day 6.
+6 Run regression tests after fixes; check Regression report; code- Fixes from Interns All interns (go/no-
+automated test coverage; run static code- quality report 1–4 go signal)
+quality analysis; confirm mocked
+AI/vector-DB calls keep the suite
+deterministic and free of external API
+costs; support interns closing out
+integration bugs.
+7 Run the final Milestone 3 validation cycle Milestone 3 QA sign-off Clean regression Mentor /
+(smoke + integration + RBAC + UI checks); report + test summary build Milestone 3
+compile the QA sign-off report and test review
+summary for the demo. No deployment
+activity is performed.
+Page 11
+
+=== PAGE 12 ===
+SwipeX — Milestone 3 SRS
+10. Day-Wise Work Plan (Plain Language + Tick-Box Checklist)
+Every day starts with a 15-minute stand-up. Tick each checkpoint box only when that item is actually working, not just
+attempted. No deployment tasks appear anywhere in this plan — everything runs locally via Docker Compose or
+against the shared dev environment.
+10.1 Intern 1 — Frontend & User Experience
+Owns: Resume Upload UI, ATS Score Dashboard, AI-Suggestions Panel
+Day What To Do (Explained Simply) Checkpoints — Tick When Done
+1 Look at the plans for the Resume and ATS APIs, and • Wireframes made for resume upload, ATS dashboard,
+sketch simple designs for the resume upload screen, and suggestions
+the ATS score dashboard, and the AI-suggestions
+• Reviewed API plans with Intern 2 and Intern 3
+panel.
+• Plan shared with the team
+2 Build the resume upload screen (drag-and-drop, list of • Resume upload UI built (mock data)
+versions) using fake data, and start building the ATS
+• ATS dashboard scaffolded
+score dashboard (score circle, missing skills list, missing
+keywords list).
+• Ready to connect to real APIs
+3 Connect the resume upload screen to the real • Resume upload connected to live APIs
+upload/list APIs, so users can actually upload a resume
+• Version list showing real data
+and see their versions; show a preview of the skills
+once they're detected.
+• Parsed-skills preview shown once available
+4 Connect the ATS score dashboard to the real scoring • ATS dashboard connected to live scoring API
+API, so it shows the actual score and lists missing skills
+• Missing skills shown correctly
+and missing keywords for a chosen job.
+• Missing keywords shown correctly
+5 Connect the AI-suggestions panel to the real • AI-suggestions panel connected and working
+suggestions API, and add a small 'AI match %' badge on
+• AI match % badge showing on job cards
+job cards in the swipe deck.
+• Quick joint test done with Intern 4
+6 Polish the app — fix rough edges on resume upload, • Responsive design checked
+ATS dashboard, and suggestions; make sure it works
+• Friendly error/empty states added
+well on phones/tablets; add friendly error messages.
+• Bugs reported by QA fixed
+7 Final Integration Day — fix any last issues and rehearse • Final test with full team done
+a simple walkthrough: upload resume → see ATS score
+• Demo walkthrough rehearsed
+→ read suggestions → see AI-matched jobs.
+• Frontend notes documented
+Page 12
+
+=== PAGE 13 ===
+SwipeX — Milestone 3 SRS
+10.2 Intern 2 — Backend & Identity Management
+Owns: Resume Service, ATS Scoring API, Recommendation Upgrade
+Day What To Do (Explained Simply) Checkpoints — Tick When Done
+1 Sketch out, in simple terms, what the Resume, ATS • Draft API contract for Resume/ATS/Suggestions
+Scoring, and AI-suggestions APIs will look like, and plan written
+how the Gateway will route to them. Check in with
+• Gateway routing plan updated
+Intern 3 about the data shape.
+• Reviewed schema plan with Intern 3
+2 Build the API that lets a user upload a resume and see • Resume upload API working
+their past versions. Make sure only Job Seekers can
+• Resume list API working
+upload.
+• Role rule added (only Job Seekers can upload)
+3 Build the API that triggers resume parsing — sending • Parse-trigger API working
+the file to Intern 4's tool and saving back the skills it
+• Extracted skills saved to the database
+finds.
+• Tested with a real resume file
+4 Build the API that returns an ATS score, missing skills, • ATS scoring API working
+and missing keywords for a resume and a job, using
+• Missing skills/keywords included in the response
+Intern 4's scoring engine.
+• Role rule tested (Job Seeker only)
+5 Build the API for AI suggestions, and update the • AI-suggestions API working
+recommendation feed to use Intern 4's smarter
+• Recommendation feed upgraded and live
+(semantic) matching. Connect everything through one
+Gateway.
+• All Milestone 3 services reachable through one
+Gateway
+6 Run the whole backend together, fix anything QA finds • End-to-end backend test done
+broken, and write simple documentation of what each
+• Bugs reported by QA fixed
+API does.
+• API documentation updated
+7 Final Integration Day — freeze the backend code, help • Backend code frozen
+demo everything, and write a short summary of what
+• Took part in full team demo
+was built.
+• Short summary document written
+Page 13
+
+=== PAGE 14 ===
+SwipeX — Milestone 3 SRS
+10.3 Intern 3 — Job & Data Intelligence
+Owns: Resume/Skill Schema, File Storage, Job Skills Data
+Day What To Do (Explained Simply) Checkpoints — Tick When Done
+1 Plan out exactly how resumes, resume versions, and • Resume/Skill table design finalized
+extracted skills will be stored, and decide where the
+• File storage approach decided
+actual resume files will live (a free storage tool).
+• Plan shared with Intern 2 and Intern 4
+2 Actually create the new database tables, and get the • Tables created and migrated
+file storage working so resumes can be saved and read
+• File storage working
+back.
+• Tested saving and reading a file
+3 Add a list of required skills and keywords to each job • Required skills/keywords added to job data
+listing, so there's something real to compare resumes
+• Existing jobs backfilled with this data
+against.
+• Shared with Intern 4
+4 Speed up the searches that match resumes to jobs, • Resume-job matching queries optimized
+and make sure the system always knows which resume
+• Default/active resume version logic working
+version is the 'current' one.
+• Shared with Intern 2 and Intern 1
+5 Join the team's full test session, double-check the • Data verified correct under test load
+resume/skill data stays correct, and update the backup
+• Backup/restore script updated
+script to include resume information.
+• Joint test done with Intern 2
+6 Write simple automated tests for the resume/skill • Automated tests written
+data, and fix any slow queries or bugs QA finds.
+• Slow queries fixed
+• Bugs reported by QA fixed
+7 Final Integration Day — confirm everything works with • Final test with full team done
+the rest of the team, and write handoff notes for what
+• Schema documentation finalized
+Milestone 4 (dashboards/notifications) will need.
+• Handover notes for Milestone 4 written
+Page 14
+
+=== PAGE 15 ===
+SwipeX — Milestone 3 SRS
+10.4 Intern 4 — AI/ML Career Intelligence
+Owns: Resume Parsing, ATS Scoring Engine, AI Suggestions, Recommendation Upgrade
+Day What To Do (Explained Simply) Checkpoints — Tick When Done
+1 Decide which free tools you'll use to read resumes, • Tools chosen for text extraction, skill-finding, and
+find skills, and compare meaning (not just exact matching
+words); plan the formula for the ATS score.
+• ATS scoring formula planned
+• Reviewed data fields with Intern 3
+2 Build the part that reads a resume file and turns it into • Text-extraction tool working
+plain text, and the part that finds skills mentioned in
+• Skill-extraction tool working
+that text.
+• Tested on a sample resume
+3 Build the first version of the ATS scorer — comparing • ATS scorer v1 working
+the resume's skills to a job's required skills and listing
+• Missing skills/keywords correctly listed
+what's missing.
+• Tested with sample resume + job pairs
+4 Make the ATS scorer smarter by also comparing the • Meaning-based comparison added
+meaning of the resume to the job (not just exact word
+• Blended score working
+matches), and blend that into the final score.
+• Tested against sample data
+5 Build the tool that writes helpful suggestions for • AI-suggestions tool working
+improving a resume, and upgrade the job
+• Recommendation feed upgraded
+recommendations to use the smarter matching.
+Connect both to the Gateway with Intern 2.
+• Joint test done with Intern 1
+6 Write tests for your tools using a few sample resumes, • Tests written for extraction/scoring/suggestions
+and check how accurate the scoring feels; fix anything
+• Accuracy spot-checked on sample resumes
+QA finds broken.
+• Bugs reported by QA fixed
+7 Final Integration Day — join the team test, and clearly • Final test with full team done
+write down what your AI tools can and can't do yet,
+• Limitations & findings documented
+plus what's planned for Milestone 4.
+• Handover notes for Milestone 4 written
+Page 15
+
+=== PAGE 16 ===
+SwipeX — Milestone 3 SRS
+10.5 Intern 5 — Platform, Testing & Deployment
+Owns: CI/CD Extension, Test Automation, Integration Validation (No Deployment)
+Day What To Do (Explained Simply) Checkpoints — Tick When Done
+1 Update the automatic checks (CI) and the shared local • CI updated for new services
+environment (Docker Compose) so they now include
+• docker-compose updated (storage + vector DB)
+file storage and the vector database; plan how to test
+• AI-testing/mocking plan written
+AI features without spending money or getting random
+results.
+2 Write down what needs testing for resume upload, • Test cases written for Resume upload/list
+and set up a tool to test that automatically, using fake
+• Automated test tool set up
+file storage.
+• CI running lint/build on new code
+3 Actually run tests against the real resume upload and • Resume upload/parse APIs tested
+parsing APIs as they go live, and note down anything
+• Bugs logged with priority
+broken.
+• CI now running the new automated tests
+4 Bring the frontend and the new resume/ATS services • First full integration test run done
+together and test the whole flow once, noting down
+• Issues logged and prioritized
+anything that doesn't work.
+• Shared with the team for Day 5 fixes
+5 Run one big, full test of the whole journey — • Full journey tested end-to-end
+uploading a resume, getting an ATS score, reading
+• Role-based access tested
+suggestions, and seeing smarter recommendations.
+• All issues logged for Day 6
+6 Re-test everything after the team's fixes, run a code- • Regression testing done
+quality check, and make sure AI tests don't rely on real
+• Code-quality report generated
+paid API calls.
+• Confirmed AI/vector tests are mocked and free
+7 Final Integration Day — run one last full check, write a • Final full test cycle completed
+summary of what was tested, and confirm no
+• QA sign-off report written
+deployment work was done.
+• Confirmed: no deployment activity performed this
+milestone
+Page 16
+
+=== PAGE 17 ===
+SwipeX — Milestone 3 SRS
+11. Daily Coordination & Integration Sync Protocol
+11.1 Daily Standup (15 minutes, start of day)
+• Each intern states: what was completed yesterday, what is planned today, and any blocker relative to the
+Dependency Matrix (Section 7).
+• Intern 2 (Backend & Identity Management) tracks blockers and re-sequences work if a dependency is late.
+11.2 Integration Checkpoints
+Checkpoint Day Purpose
+Contract Freeze Day 2 (EOD) Resume, ATS Scoring, and Recommendation-upgrade API contracts are frozen;
+no breaking changes without team sign-off
+First Vertical Slice Day 3–4 Resume upload + parse + ATS scoring reachable end-to-end from the frontend
+through the Gateway
+Full Integration Day 5 All Milestone 3 services (Resume, ATS Scoring, AI Suggestions, upgraded
+Recommendation, Frontend) run together in docker-compose.dev.yml and pass
+smoke tests
+Regression & Sign-off Day 7 Final validation cycle passes; Milestone 3 increment is signed off by QA and the
+mentor
+11.3 Change Control
+Any change to a frozen interface contract after Day 2 must be raised by the owning intern in standup, agreed by all
+consumers listed in Section 7, and reflected the same day in the shared Postman/pytest collection maintained by
+Intern 5.
+12. Milestone 3 Deliverables Checklist
+Deliverable Owner Due
+Extended Resume/Skill schema + file storage layer Intern 3 Day 2
+Frozen API contracts (Resume, ATS Scoring, AI Suggestions) Intern 2 / 4 Day 2
+Working Resume Service (upload, versions, RBAC enforced) Intern 2 Day 2–3
+Text-extraction & skill-extraction pipeline Intern 4 Day 2–3
+Job required-skills/keywords data (backfilled) Intern 3 Day 3
+Blended (keyword + semantic) ATS Scoring engine + API Intern 4 / Intern 2 Day 3–4
+AI-suggestions module + API (with free fallback) Intern 4 / Intern 2 Day 5
+Upgraded Recommendation Engine (semantic + swipe history) Intern 4 Day 5
+Resume upload UI + ATS dashboard + AI-suggestions panel Intern 1 Day 2–6
+(frontend)
+CI/docker-compose updated (storage + vector DB) for Intern 5 Day 1–2
+Milestone 3
+Test plan, test cases, defect log Intern 5 Day 1–7 (continuous)
+Full integration inside local Docker Compose All (led by Intern 2 & 5) Day 5
+Regression report + code-quality report Intern 5 Day 6
+Page 17
+
+=== PAGE 18 ===
+SwipeX — Milestone 3 SRS
+Deliverable Owner Due
+Milestone 3 sign-off report + demo All Day 7
+Page 18
+
+=== PAGE 19 ===
+SwipeX — Milestone 3 SRS
+13. Milestone 3 Acceptance Criteria
+• Job Seekers can upload a resume, retrieve prior versions, and see it correctly parsed into structured
+skills/experience.
+• The ATS Scoring engine returns a blended keyword-and-semantic-similarity score for any resume/job pair.
+• When the ATS score is below 80%, the system correctly identifies and returns missing skills and missing keywords,
+per the project charter's example.
+• The AI-suggestions module returns resume-optimization suggestions, with a working free fallback when no LLM
+credits are available.
+• The Recommendation/Matching Engine is upgraded to use semantic similarity blended with Milestone 2's swipe-
+history signal, and is reachable end-to-end through the Gateway.
+• The frontend supports resume upload/versioning, displays the ATS score with missing skills/keywords, shows AI-
+generated suggestions, and surfaces AI match percentages on job cards.
+• RBAC restricts resume upload, ATS scoring, and suggestion actions to the Job Seeker role.
+• All Milestone 3 services run together and pass integration/smoke tests inside the local Docker Compose
+environment.
+• CI enforces lint, build, and automated test checks on every pull request, with AI/vector-DB calls mocked for
+determinism and cost control.
+• Every tool used across the milestone was free/open-source — no paid subscriptions were required.
+• No production deployment activity has occurred; deployment remains explicitly scheduled for after Milestone 4.
+14. Risks & Mitigations
+Risk Impact Mitigation
+Resume text extraction fails or is inaccurate on High Intern 4 tests extraction against a varied sample set from
+inconsistently formatted PDFs/DOCX files Day 2; Intern 2's parse-trigger endpoint surfaces a clear
+error rather than a silent failure
+Interface contracts (Resume/ATS/Suggestions) High Contract freeze checkpoint (Section 11.2) + change-control
+change after Day 2, breaking downstream process (Section 11.3)
+work
+LLM-based suggestions are unavailable or Medium A fully free, rule-based/template suggestion generator is
+rate-limited (no paid plan) built as a mandatory fallback, not an afterthought
+Job required-skills/keywords data is too thin, Medium Intern 3 backfills structured skills/keywords for all Milestone
+making ATS scoring look inaccurate 2 seed jobs by Day 3; Intern 4 flags gaps early
+Vector database (ChromaDB) integration adds Medium Intern 5 adds ChromaDB to docker-compose.dev.yml on Day
+setup complexity mid-milestone 1, ahead of Intern 4 needing it on Day 4
+AI/vector-DB calls make automated tests slow, Medium Intern 5 mocks all AI/vector-DB calls in the automated test
+costly, or non-deterministic suite from Day 1 planning onward
+Resume files contain sensitive personal data Medium Access to resume files and parsed data is restricted via RBAC
+to the owning Job Seeker; Intern 2 enforces this at the API
+layer
+Late defect discovery on Day 6–7 with no Medium Continuous QA involvement from Day 3 onward, with a full
+buffer integration round on Day 4 and Day 5, rather than testing
+only at the end
+Team accidentally starts deployment work Low Reminder in every stand-up that deployment is out of scope
+for Milestone 3 and reserved for Milestone 4
+Page 19
+
+=== PAGE 20 ===
+SwipeX — Milestone 3 SRS
+15. Non-Functional Requirements — Milestone 3 Scope
+NFR ID Requirement Category
+NFR-01 Resume text extraction and skill parsing complete within a few seconds for typical Performance
+resume file sizes in the dev environment
+NFR-02 ATS scoring (keyword + semantic) returns a result within acceptable dev- Performance
+environment latency (target: under 2 seconds per resume/job pair)
+NFR-03 Resume files and parsed resume data are only accessible to the owning Job Seeker Security / Privacy
+via RBAC-enforced endpoints
+NFR-04 The system degrades gracefully to the free rule-based suggestion generator if the Reliability
+optional LLM layer is unavailable, without breaking the user flow
+NFR-05 The ATS dashboard and suggestions panel remain responsive and usable on both Usability
+desktop and mobile-width viewports
+NFR-06 All Milestone 3 services and their dependencies (including file storage and the Portability / Cost
+vector database) run entirely within the shared docker-compose.dev.yml with no
+external paid services
+16. Sign-Off
+Signature / Approval
+Role Name
+Date
+Educator / Mentor
+Intern 1 — Frontend & User Experience
+Intern 2 — Backend & Identity Management
+Intern 3 — Job & Data Intelligence
+Intern 4 — AI/ML Career Intelligence
+Intern 5 — Platform, Testing & Deployment
+Page 20

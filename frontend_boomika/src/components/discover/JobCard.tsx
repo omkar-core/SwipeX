@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   MapPin, 
   DollarSign, 
@@ -15,9 +15,11 @@ import {
 } from 'lucide-react';
 import { Job } from '../../types';
 import { getJobImage } from '../../utils/getJobImage';
+import { AiMatchBadge } from './AiMatchBadge';
 
 export interface JobCardProps {
   job: Job;
+  match_percentage?: number;
   onPass?: () => void;
   onSave?: () => void;
   onUndo?: () => void;
@@ -32,8 +34,21 @@ export interface JobCardProps {
  * Reusable Job Card Component
  * Conforms to Milestone 2 Day 1 Wireframe & UX Specifications.
  */
+// Pure helper to compute freshness indicator
+function getFreshnessLabel(postedAt?: string): string | null {
+  if (!postedAt) return null;
+  const postedTime = new Date(postedAt).getTime();
+  if (isNaN(postedTime)) return null;
+  const diffHours = (Date.now() - postedTime) / (1000 * 60 * 60);
+  if (diffHours < 24) return '✨ New Today';
+  if (diffHours < 48) return '🕒 1d ago';
+  if (diffHours < 168) return `🕒 ${Math.floor(diffHours / 24)}d ago`;
+  return null;
+}
+
 export const JobCard: React.FC<JobCardProps> = ({
   job,
+  match_percentage,
   onPass,
   onSave,
   onUndo,
@@ -42,17 +57,7 @@ export const JobCard: React.FC<JobCardProps> = ({
   className = '',
   showControls = true
 }) => {
-  // Compute freshness indicator
-  const getFreshnessLabel = (postedAt?: string) => {
-    if (!postedAt) return null;
-    const diffHours = (Date.now() - new Date(postedAt).getTime()) / (1000 * 60 * 60);
-    if (diffHours < 24) return '✨ New Today';
-    if (diffHours < 48) return '🕒 1d ago';
-    if (diffHours < 168) return `🕒 ${Math.floor(diffHours / 24)}d ago`;
-    return null;
-  };
-
-  const freshness = getFreshnessLabel(job.posted_at);
+  const freshness = useMemo(() => getFreshnessLabel(job.posted_at), [job.posted_at]);
 
   // Compute competition label
   const isLowCompetition = job.competition_level === 'low' || (job.applicant_count !== undefined && job.applicant_count < 10);
@@ -61,6 +66,8 @@ export const JobCard: React.FC<JobCardProps> = ({
   const displaySkills = (job.skills_required && job.skills_required.length > 0)
     ? job.skills_required
     : (job.skills || job.tags || ['React', 'TypeScript', 'Tailwind CSS']);
+
+  const effectiveMatchScore = match_percentage ?? job.match_score ?? job.ats_match_score;
 
   return (
     <div className={`w-full bg-white dark:bg-[#111827] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col relative select-none transition-colors ${className}`}>
@@ -74,7 +81,7 @@ export const JobCard: React.FC<JobCardProps> = ({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
-        {/* Top Badges (Hot Match / Freshness / Company Type) */}
+        {/* Top Badges (Hot Match / Freshness / Company Type / AI Match %) */}
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10 gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {job.company_type && (
@@ -88,6 +95,8 @@ export const JobCard: React.FC<JobCardProps> = ({
                 {freshness}
               </span>
             )}
+            {/* AI Match Badge */}
+            <AiMatchBadge match_percentage={effectiveMatchScore} />
           </div>
 
           {job.is_hot_match && (

@@ -11,7 +11,9 @@ import {
   LayoutDashboard,
   PlusCircle,
   Columns3,
-  Users
+  Users,
+  Target,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TabType } from './TopNav';
@@ -30,9 +32,11 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
   const candidateNavItems = [
     { id: 'discover' as TabType, label: 'Discover', icon: Compass },
     { id: 'applications' as TabType, label: 'Applications', icon: Briefcase },
-    { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
-    { id: 'messages' as TabType, label: 'Messages', icon: MessageSquare },
+    { id: 'ats-dashboard' as TabType, label: 'ATS Score Matrix', icon: Target },
+    { id: 'resume' as TabType, label: 'Resume Versions', icon: FileText },
     { id: 'analytics' as TabType, label: 'Analytics', icon: BarChart2 },
+    { id: 'messages' as TabType, label: 'Messages', icon: MessageSquare },
+    { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
   ];
 
   const recruiterNavItems = [
@@ -52,7 +56,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
     switchRole(newRole);
     if (newRole === 'recruiter') {
       onTabChange('recruiter-dashboard');
-    } else if (newRole === 'job_seeker') {
+    } else if (newRole === 'candidate') {
       onTabChange('discover');
     }
     showToast(`Switched active workspace view to ${newRole.toUpperCase()}`, 'info');
@@ -103,7 +107,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
                 onChange={handleRoleChange}
                 className="w-full bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-subtle"
               >
-                <option value="job_seeker">Candidate (Job Seeker)</option>
+                <option value="candidate">Candidate (Job Seeker)</option>
                 <option value="recruiter">Recruiter (Talent Partner)</option>
                 <option value="admin">Platform Admin</option>
               </select>

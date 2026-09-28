@@ -2,15 +2,16 @@ import React from 'react';
 import { Bell, Zap, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { API_CONFIG } from '../../config/api';
 
 
 export type TabType = 
   | 'discover' 
-  | 'companies'
   | 'applications' 
+  | 'ats-dashboard'
+  | 'resume'
   | 'messages' 
   | 'analytics' 
-  | 'resume' 
   | 'profile'
   | 'recruiter-dashboard'
   | 'recruiter-post-job'
@@ -29,10 +30,11 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
 
   const candidateTabs: { id: TabType; label: string }[] = [
     { id: 'discover', label: 'Discover' },
-    { id: 'companies', label: 'Companies' },
     { id: 'applications', label: 'Applications' },
-    { id: 'messages', label: 'Messages' },
+    { id: 'ats-dashboard', label: 'ATS Score' },
+    { id: 'resume', label: 'Resume' },
     { id: 'analytics', label: 'Analytics' },
+    { id: 'messages', label: 'Messages' },
   ];
 
   const recruiterTabs: { id: TabType; label: string }[] = [
@@ -82,7 +84,18 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
       </nav>
 
       {/* Right Icons & Profile */}
-      <div className="flex items-center gap-3.5 sm:gap-4">
+      <div className="flex items-center gap-3 sm:gap-3.5">
+        {/* Mock Mode Indicator */}
+        {API_CONFIG.USE_MOCK && (
+          <span 
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/80 shadow-xs"
+            title="Running in mock mode with simulated data. Set VITE_USE_MOCK=false to connect to live backend."
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Mock Data
+          </span>
+        )}
+
         {/* Notification Bell */}
         <button
           type="button"

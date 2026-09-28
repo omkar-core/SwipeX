@@ -1,57 +1,4 @@
-export type UserRole = 'job_seeker' | 'recruiter' | 'admin';
-
-export interface AdminDashboardData {
-  total_users: number;
-  total_recruiters: number;
-  total_job_seekers: number;
-  total_jobs: number;
-  active_jobs: number;
-  total_applications: number;
-  pending_items: number;
-}
-
-export interface AdminUserRecord {
-  user_id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  status: string;
-  created_at?: string;
-  company_name?: string;
-}
-
-export interface AdminRecruiterRecord extends AdminUserRecord {
-  designation?: string;
-  job_count: number;
-}
-
-export interface AdminJobRecord {
-  job_id: string;
-  title: string;
-  company: string;
-  location: string;
-  status: JobStatus;
-  recruiter_id?: string;
-  posted_at?: string;
-  application_count: number;
-}
-
-export interface AdminApplicationRecord {
-  application_id: string;
-  candidate_name: string;
-  candidate_email: string;
-  job_title: string;
-  company: string;
-  recruiter_id?: string;
-  stage: string;
-  applied_at?: string;
-}
-
-export interface AdminAnalyticsData {
-  user_types: Record<string, number>;
-  job_status: Record<string, number>;
-  application_stages: Record<string, number>;
-}
+export type UserRole = 'candidate' | 'recruiter' | 'admin';
 
 export interface User {
   user_id: string;
@@ -179,7 +126,6 @@ export interface FilterState {
   salaryMin: number;
   salaryMax: number;
   workEnvironments: ('Remote' | 'Hybrid' | 'On-site')[];
-  searchQuery?: string;
 }
 
 export interface TimelineItem {
@@ -209,6 +155,35 @@ export interface SavedJob {
   savedAt: string;
 }
 
+export type ParseStatus = 'pending' | 'analyzing' | 'parsed' | 'failed';
+
+export interface SkillCategoryGroup {
+  category: string;
+  skills: string[];
+}
+
+export interface ResumeVersion {
+  id?: string;
+  resume_id: string;
+  version: number;
+  version_label?: string;
+  filename: string;
+  file_size?: string;
+  uploaded_at: string;
+  is_default: boolean;
+  parse_status: ParseStatus;
+  parsed_skills: string[];
+  extracted_skills?: string[];
+  parsed_text?: string;
+  skill_categories?: SkillCategoryGroup[];
+  overall_fit_score: number;
+  format_compatibility: 'High' | 'Medium' | 'Low';
+  experience_years?: number;
+  target_track?: string;
+  parse_error?: string;
+  resume_url?: string;
+}
+
 export interface ResumeData {
   resume_id: string;
   filename: string;
@@ -221,10 +196,52 @@ export interface ResumeData {
   progress: number;
 }
 
+export interface MissingSkillItem {
+  skill: string;
+  importance: 'high' | 'medium' | 'low';
+  category?: string;
+}
+
 export interface ATSScoreResult {
   match_score: number;
   missing_keywords: string[];
   generated_by: string;
+}
+
+export interface ATSScoreDetailResult {
+  resume_id: string;
+  job_id: string;
+  match_score: number;
+  is_interview_ready: boolean;
+  benchmark_threshold: number; // 80
+  matched_skills: string[];
+  missing_skills: MissingSkillItem[];
+  missing_keywords: string[];
+  sub_scores?: {
+    skills_match: number;
+    experience_fit: number;
+    work_environment_fit: number;
+  };
+  generated_by: string;
+  evaluated_at: string;
+}
+
+export interface AISuggestionItem {
+  id: string;
+  section: 'Experience' | 'Skills' | 'Summary' | 'Structure';
+  target_company?: string;
+  title: string;
+  current_text?: string;
+  recommended_text: string;
+  keywords_added?: string[];
+  estimated_score_boost: number;
+  reasoning?: string;
+}
+
+export interface AISuggestionsResult {
+  resume_id: string;
+  job_id: string;
+  suggestions: AISuggestionItem[];
 }
 
 export interface JobRecommendation {
@@ -344,24 +361,6 @@ export interface CandidateAnalyticsData {
   top_industries: CandidateIndustryEngagementItem[];
   activity_heatmap: CandidateActivityDayItem[];
   generated_at?: string;
-}
-
-export interface Company {
-  id: string;
-  company_id?: string;
-  name: string;
-  company_type?: string;
-  aggregate_rating?: number;
-  reviews_count?: number;
-  about?: string;
-  size?: string;
-  industry?: string;
-  is_newly_founded: boolean;
-  jobs_count?: number;
-}
-
-export interface CompanyDetail extends Company {
-  jobs: Job[];
 }
 
 

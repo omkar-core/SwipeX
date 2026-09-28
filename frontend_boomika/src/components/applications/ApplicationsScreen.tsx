@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   FileText, 
   Check, 
@@ -12,10 +12,7 @@ import {
   ExternalLink,
   LayoutList,
   Columns3,
-  Trophy,
-  History,
-  ThumbsUp,
-  ThumbsDown
+  Trophy
 } from 'lucide-react';
 
 import { useJobs } from '../../context/JobContext';
@@ -23,7 +20,6 @@ import { useResume } from '../../context/ResumeContext';
 import { useToast } from '../../context/ToastContext';
 import { KanbanBoard } from './KanbanBoard';
 import { ProfileStrengthMeter } from './ProfileStrengthMeter';
-import { ApiService } from '../../services/api';
 
 
 interface ApplicationsScreenProps {
@@ -45,24 +41,6 @@ export const ApplicationsScreen: React.FC<ApplicationsScreenProps> = ({ onNaviga
     : timeline;
 
   const currentMatchScore = atsResult?.match_score || 85;
-
-  // Swipe history state
-  const [swipeHistory, setSwipeHistory] = useState<Array<{ job_id: number | string; direction: string; swiped_at: string }>>([]);
-  const [historyTab, setHistoryTab] = useState<'saved' | 'history'>('saved');
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const history = await ApiService.getSwipeHistory();
-        if (history && Array.isArray(history)) {
-          setSwipeHistory(history);
-        }
-      } catch (e) {
-        console.warn("Could not load swipe history:", e);
-      }
-    };
-    fetchHistory();
-  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -334,93 +312,52 @@ export const ApplicationsScreen: React.FC<ApplicationsScreenProps> = ({ onNaviga
             </div>
           </div>
 
-          {/* RECENTLY SAVED & SWIPE HISTORY Card */}
+          {/* RECENTLY SAVED Card */}
           <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-subtle">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setHistoryTab('saved')}
-                  className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                    historyTab === 'saved' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-slate-400 hover:text-slate-600'
-                  }`}
-                >
-                  Saved ({savedJobs.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHistoryTab('history')}
-                  className={`text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
-                    historyTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600 pb-0.5' : 'text-slate-400 hover:text-slate-600'
-                  }`}
-                >
-                  <History className="w-3 h-3" />
-                  Swipes ({swipeHistory.length})
-                </button>
-              </div>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                RECENTLY SAVED
+              </h3>
+              <button
+                type="button"
+                onClick={() => showToast('Showing all saved roles', 'info')}
+                className="text-xs font-semibold text-[#2563EB] hover:underline cursor-pointer"
+              >
+                View All
+              </button>
             </div>
 
-            {historyTab === 'saved' ? (
-              <div className="space-y-3">
-                {savedJobs.slice(0, 5).map((job) => (
-                  <div
-                    key={job.id}
-                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[#E2E8F0] flex items-center justify-center text-slate-800 font-bold text-sm">
-                        {job.logoLetter}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                          {job.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {job.company} • {job.location}
-                        </p>
-                      </div>
+            <div className="space-y-3">
+              {savedJobs.slice(0, 5).map((job) => (
+                <div
+                  key={job.id}
+                  className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Logo Square */}
+                    <div className="w-9 h-9 rounded-lg bg-[#E2E8F0] flex items-center justify-center text-slate-800 font-bold text-sm">
+                      {job.logoLetter}
                     </div>
-
-                    <button
-                      type="button"
-                      aria-label="Saved Bookmark"
-                      className="text-slate-400 hover:text-slate-600 p-1"
-                    >
-                      <Bookmark className="w-4 h-4" />
-                    </button>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        {job.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {job.company} • {job.location}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {swipeHistory.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-3 text-center">No past swipe actions recorded yet.</p>
-                ) : (
-                  swipeHistory.slice(0, 6).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        {item.direction.toLowerCase() === 'right' ? (
-                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                            <ThumbsUp className="w-3 h-3" />
-                          </span>
-                        ) : (
-                          <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
-                            <ThumbsDown className="w-3 h-3" />
-                          </span>
-                        )}
-                        <span className="font-semibold text-slate-800">Job {String(item.job_id).slice(0, 8)}...</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">
-                        {item.direction}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
+
+                  <button
+                    type="button"
+                    aria-label="Saved Bookmark"
+                    className="text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    <Bookmark className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
         </div>

@@ -10,11 +10,11 @@
 
 export const API_CONFIG = {
   // Base URL for real backend REST endpoints
-  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8001/api/v1',
+  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8000/api/v1',
   
   // Flag to toggle between real fetch calls and isolated mock fallback
-  // Default is false (real backend) unless VITE_USE_MOCK is explicitly true
-  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true,
+  // Default is true when VITE_USE_MOCK is 'true' or not specified in dev
+  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'false' ? false : true,
 
   // Request timeout in milliseconds
   TIMEOUT_MS: 10000,
@@ -26,6 +26,8 @@ export const API_CONFIG = {
     USER: 'swipex_user',
     SWIPES: 'swipex_swipes',
     RESUME: 'swipex_resume',
+    RESUME_VERSIONS: 'swipex_resume_versions',
+    ACTIVE_RESUME_ID: 'swipex_active_resume_id',
     SAVED_JOBS: 'swipex_saved_jobs',
     RECRUITER_JOBS: 'swipex_recruiter_jobs',
     RECRUITER_APPLICANTS: 'swipex_recruiter_applicants',
@@ -41,21 +43,23 @@ export const API_ENDPOINTS = {
   },
   JOBS: {
     LIST: '/jobs',
-    SEARCH: '/jobs/search',
     DETAIL: (jobId: string) => `/jobs/${jobId}`,
-  },
-  COMPANIES: {
-    LIST: '/companies',
-    DETAIL: (companyId: string) => `/companies/${companyId}`,
+    RECOMMENDATIONS: '/jobs/recommendations',
   },
   SWIPES: {
     SUBMIT: '/swipes',
     HISTORY: '/swipes/history',
   },
-  RESUME: {
-    UPLOAD: '/resume/upload',
-    ATS_SCORE: (resumeId: string) => `/resume/${resumeId}/ats-score`,
-    RECOMMENDATIONS: '/recommendations',
+  RESUMES: {
+    UPLOAD: '/resumes/upload',
+    LIST: '/resumes',
+    PARSE: (resumeId: string) => `/resumes/${resumeId}/parse`,
+    SET_DEFAULT: (resumeId: string) => `/resumes/${resumeId}/set-default`,
+    DELETE: (resumeId: string) => `/resumes/${resumeId}`,
+  },
+  ATS: {
+    SCORE: '/ats/score',
+    SUGGESTIONS: '/ats/suggestions',
   },
   PROFILE: {
     ME: '/profile/me',
@@ -71,14 +75,6 @@ export const API_ENDPOINTS = {
   },
   ANALYTICS: {
     CANDIDATE_SUMMARY: '/analytics/candidate-summary',
-  },
-  ADMIN: {
-    DASHBOARD: '/admin/dashboard',
-    USERS: '/admin/users',
-    RECRUITERS: '/admin/recruiters',
-    JOBS: '/admin/jobs',
-    APPLICATIONS: '/admin/applications',
-    ANALYTICS: '/admin/analytics',
   }
 };
 

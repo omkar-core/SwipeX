@@ -103,13 +103,13 @@ export const CandidatePipeline: React.FC = () => {
   const [dragOverCol, setDragOverCol] = useState<PipelineStage | null>(null);
 
   const currentJobIdKey = String(selectedJobId || (postedJobs[0]?.job_id ?? '1'));
-  const rawApplicants = applicantsByJob[currentJobIdKey] || [];
 
   // Filter applicants by search query (name, current_title, or skills)
   const filteredApplicants = useMemo(() => {
-    if (!searchQuery.trim()) return rawApplicants;
+    const raw = applicantsByJob[currentJobIdKey] || [];
+    if (!searchQuery.trim()) return raw;
     const q = searchQuery.toLowerCase().trim();
-    return rawApplicants.filter(app => {
+    return raw.filter(app => {
       const c = app.candidate;
       return (
         c.name.toLowerCase().includes(q) ||
@@ -117,7 +117,7 @@ export const CandidatePipeline: React.FC = () => {
         c.skills.some(s => s.toLowerCase().includes(q))
       );
     });
-  }, [rawApplicants, searchQuery]);
+  }, [applicantsByJob, currentJobIdKey, searchQuery]);
 
   // Drag and drop handlers
   const handleDragStart = (applicationId: string) => {

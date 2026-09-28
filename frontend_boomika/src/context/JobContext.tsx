@@ -9,23 +9,19 @@ interface JobContextType {
   allJobs: Job[];
   currentIndex: number;
   currentJob: Job | null;
-  nextJob: Job | null;
-  canUndo: boolean;
   filters: FilterState;
   savedJobs: SavedJob[];
   timeline: TimelineItem[];
   recommendedActions: RecommendedAction[];
   isLoadingJobs: boolean;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
-  handleSwipe: (direction: 'left' | 'right', jobId?: string | number) => Promise<void>;
-  undoLastSwipe: () => Promise<Job | null>;
+  handleSwipe: (direction: 'left' | 'right') => Promise<void>;
   resetDeck: () => void;
   saveCurrentJob: () => Promise<void>;
   passCurrentJob: () => Promise<void>;
   toggleWorkEnvironment: (env: 'Remote' | 'Hybrid' | 'On-site') => void;
   setIndustry: (industry: string) => void;
   setSalaryRange: (min: number, max: number) => void;
-  setSearchQuery: (query: string) => void;
   refetchJobs: () => Promise<void>;
 }
 
@@ -38,10 +34,9 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(false);
   const [filters, setFilters] = useState<FilterState>({
     industry: 'All',
-    salaryMin: 40000,
+    salaryMin: 120000,
     salaryMax: 270000,
     workEnvironments: ['Remote', 'Hybrid', 'On-site'],
-    searchQuery: '',
   });
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -53,17 +48,12 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchJobs = useCallback(async () => {
     setIsLoadingJobs(true);
     try {
-      let fetched: Job[] = [];
-      if (filters.searchQuery && filters.searchQuery.trim()) {
-        fetched = await ApiService.searchJobs(filters.searchQuery.trim());
-      } else {
-        fetched = await ApiService.getJobs({
-          industry: filters.industry !== 'All' ? filters.industry : undefined,
-          salary_min: filters.salaryMin,
-          salary_max: filters.salaryMax,
-          remote: filters.workEnvironments && filters.workEnvironments.length > 0 ? filters.workEnvironments.join(',') : undefined,
-        });
-      }
+      const fetched = await ApiService.getJobs({
+        industry: filters.industry !== 'All' ? filters.industry : undefined,
+        salary_min: filters.salaryMin,
+        salary_max: filters.salaryMax,
+        remote: filters.workEnvironments.join(','),
+      });
       setJobs(fetched);
       setAllJobs(fetched);
       setCurrentIndex(0);
@@ -79,48 +69,30 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [fetchJobs]);
 
   const currentJob = jobs[currentIndex] || null;
-  const nextJob = currentIndex + 1 < jobs.length ? jobs[currentIndex + 1] : null;
-  const canUndo = currentIndex > 0;
 
-  const undoLastSwipe = useCallback(async (): Promise<Job | null> => {
-    if (currentIndex > 0) {
-      const prevIdx = currentIndex - 1;
-      setCurrentIndex(prevIdx);
-      return jobs[prevIdx] || null;
-    }
-    return null;
-  }, [currentIndex, jobs]);
-
-  const setSearchQuery = useCallback((searchQuery: string) => {
-    setFilters(prev => ({ ...prev, searchQuery }));
-  }, []);
-
-  const handleSwipe = useCallback(async (direction: 'left' | 'right', targetJobId?: string | number) => {
-    const jobToSwipe = targetJobId 
-      ? jobs.find(j => String(j.job_id) === String(targetJobId)) || currentJob
-      : currentJob;
-    if (!jobToSwipe) return;
+  const handleSwipe = useCallback(async (direction: 'left' | 'right') => {
+    if (!currentJob) return;
 
     try {
       // POST swipe to service
-      await ApiService.postSwipe({ job_id: String(jobToSwipe.job_id), direction });
+      await ApiService.postSwipe({ job_id: String(currentJob.job_id), direction });
       
       if (direction === 'right') {
-        showToast(`Saved ${jobToSwipe.title} at ${jobToSwipe.company}!`, 'success');
+        showToast(`Saved ${currentJob.title} at ${currentJob.company}!`, 'success');
         
         // Add to saved jobs state
         setSavedJobs(prev => {
-          if (prev.some(s => s.title === jobToSwipe.title && s.company === jobToSwipe.company)) {
+          if (prev.some(s => s.title === currentJob.title && s.company === currentJob.company)) {
             return prev;
           }
           const logoColors = ['bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-purple-600', 'bg-rose-600', 'bg-amber-600'];
           const randomColor = logoColors[Math.floor(Math.random() * logoColors.length)];
           const newSaved: SavedJob = {
-            id: `saved_${jobToSwipe.job_id}_${Date.now()}`,
-            title: jobToSwipe.title,
-            company: jobToSwipe.company,
-            location: jobToSwipe.location,
-            logoLetter: jobToSwipe.company.charAt(0).toUpperCase(),
+            id: `saved_${currentJob.job_id}_${Date.now()}`,
+            title: currentJob.title,
+            company: currentJob.company,
+            location: currentJob.location,
+            logoLetter: currentJob.company.charAt(0).toUpperCase(),
             logoBgColor: randomColor,
             savedAt: 'Just now'
           };
@@ -129,22 +101,22 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Add to timeline application pipeline
         setTimeline(prev => {
-          if (prev.some(t => t.company === jobToSwipe.company && t.title.includes(jobToSwipe.title))) {
+          if (prev.some(t => t.company === currentJob.company && t.title.includes(currentJob.title))) {
             return prev;
           }
           const newTimelineItem: TimelineItem = {
-            id: `timeline_${jobToSwipe.job_id}_${Date.now()}`,
+            id: `timeline_${currentJob.job_id}_${Date.now()}`,
             type: 'submitted',
             title: `Application Submitted`,
-            company: jobToSwipe.company,
+            company: currentJob.company,
             time: 'Just now',
-            description: `Saved & applied for ${jobToSwipe.title} at ${jobToSwipe.company}. Match Score: ${jobToSwipe.match_score ?? jobToSwipe.ats_match_score ?? 85}%.`,
+            description: `Saved & applied for ${currentJob.title} at ${currentJob.company}. Match Score: ${currentJob.match_score ?? currentJob.ats_match_score ?? 85}%.`,
             status: 'Active'
           };
           return [newTimelineItem, ...prev];
         });
       } else {
-        showToast(`Passed on ${jobToSwipe.company}`, 'info');
+        showToast(`Passed on ${currentJob.company}`, 'info');
       }
 
       setCurrentIndex(prev => prev + 1);
@@ -152,7 +124,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast(err.message || 'Recorded swipe locally', 'info');
       setCurrentIndex(prev => prev + 1);
     }
-  }, [currentJob, jobs, showToast]);
+  }, [currentJob, showToast]);
 
   const saveCurrentJob = useCallback(async () => {
     await handleSwipe('right');
@@ -192,8 +164,6 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         allJobs,
         currentIndex,
         currentJob,
-        nextJob,
-        canUndo,
         filters,
         savedJobs,
         timeline,
@@ -201,14 +171,12 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLoadingJobs,
         setFilters,
         handleSwipe,
-        undoLastSwipe,
         resetDeck,
         saveCurrentJob,
         passCurrentJob,
         toggleWorkEnvironment,
         setIndustry,
         setSalaryRange,
-        setSearchQuery,
         refetchJobs: fetchJobs,
       }}
     >

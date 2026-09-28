@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useJobs } from '../../context/JobContext';
+import { useJobFeed } from '../../hooks/useJobFeed';
 import { SwipeDeck } from './SwipeDeck';
 import { FiltersPanel, FiltersState } from './FiltersPanel';
 import { MatchRing } from './MatchRing';
@@ -8,47 +8,22 @@ import { SkillGapDrawer } from './SkillGapDrawer';
 import { SwipeStatsWidget } from './SwipeStatsWidget';
 import { JobDetailModal } from './JobDetailModal';
 import { Job } from '../../types';
-import { Check, Sparkles, Loader2 } from 'lucide-react';
-import { ApiService } from '../../services/api';
+import { Check } from 'lucide-react';
 
 export const DiscoverScreen: React.FC = () => {
   const { user } = useAuth();
   
-  // Real JobContext backed by backend API
+  // Milestone 2 Data Abstraction Hook
   const {
     jobs,
     currentIndex,
     currentJob,
     nextJob,
     canUndo,
-    filters,
-    setFilters,
-    handleSwipe: postSwipeAction,
+    recordSwipe,
     undoLastSwipe,
     resetDeck
-  } = useJobs();
-
-  // Recommendations state
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [loadingRecs, setLoadingRecs] = useState(false);
-
-  useEffect(() => {
-    const loadRecs = async () => {
-      if (!user?.user_id) return;
-      setLoadingRecs(true);
-      try {
-        const res = await ApiService.getRecommendations(user.user_id);
-        if (res && Array.isArray(res)) {
-          setRecommendations(res);
-        }
-      } catch (err) {
-        console.warn("Recommendations fetch:", err);
-      } finally {
-        setLoadingRecs(false);
-      }
-    };
-    loadRecs();
-  }, [user?.user_id]);
+  } = useJobFeed();
 
   // Feature 2: Skill Gap Drawer state
   const [skillGapJob, setSkillGapJob] = useState<Job | null>(null);
@@ -69,46 +44,22 @@ export const DiscoverScreen: React.FC = () => {
     } else {
       window.dispatchEvent(new CustomEvent('swipex:swipe', { detail: { direction: 'left' } }));
     }
-    await postSwipeAction(direction, jobId);
-  }, [currentJob, postSwipeAction]);
+    await recordSwipe(jobId, direction);
+  }, [currentJob, recordSwipe]);
 
   // Undo swipe handler
   const handleUndo = useCallback(async (): Promise<Job | null> => {
     return await undoLastSwipe();
   }, [undoLastSwipe]);
 
-  const openJobDetail = useCallback(async (job: Job) => {
+  const openJobDetail = useCallback((job: Job) => {
     setDetailJob(job);
     setIsDetailOpen(true);
-    try {
-      const fullDetail = await ApiService.getJobById(String(job.job_id));
-      if (fullDetail) {
-        setDetailJob(fullDetail);
-      }
-    } catch (err) {
-      console.warn("Could not fetch full job details, using feed summary:", err);
-    }
   }, []);
 
-  const handleApplyFilters = useCallback((newFilters: FiltersState) => {
-    setFilters(prev => ({
-      ...prev,
-      searchQuery: newFilters.searchQuery,
-      salaryMin: newFilters.minSalary,
-      workEnvironments: newFilters.workEnvironments as ('Remote' | 'Hybrid' | 'On-site')[],
-    }));
-  }, [setFilters]);
-
-  const handleResetFilters = useCallback(() => {
-    resetDeck();
-    setFilters({
-      industry: 'All',
-      salaryMin: 40000,
-      salaryMax: 270000,
-      workEnvironments: ['Remote', 'Hybrid', 'On-site'],
-      searchQuery: '',
-    });
-  }, [resetDeck, setFilters]);
+  const handleApplyFilters = useCallback((filters: FiltersState) => {
+    console.debug('[DiscoverScreen] Applied filters (Local state):', filters);
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -146,16 +97,8 @@ export const DiscoverScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Panel Connected to Backend */}
-          <FiltersPanel
-            initialFilters={{
-              searchQuery: filters.searchQuery || '',
-              workEnvironments: filters.workEnvironments || ['Remote', 'Hybrid'],
-              minSalary: filters.salaryMin || 60000,
-            }}
-            onApplyFilters={handleApplyFilters}
-            onResetFilters={handleResetFilters}
-          />
+          {/* Filters Panel Scaffold (Day 2 Component) */}
+          <FiltersPanel onApplyFilters={handleApplyFilters} />
         </div>
 
         {/* Center Column: Framer Motion Swipe Deck */}
@@ -246,55 +189,6 @@ export const DiscoverScreen: React.FC = () => {
                 ))}
               </div>
             </div>
-
-            {/* Top AI Recommendations */}
-            <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  AI Recommended Roles
-                </h4>
-                {loadingRecs && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
-              </div>
-              <div className="space-y-2">
-                {recommendations.length === 0 && !loadingRecs ? (
-                  <p className="text-[11px] text-slate-400 italic">No personalized recommendations available yet.</p>
-                ) : (
-                  recommendations.slice(0, 4).map((rec: any, idx) => (
-                    <div
-                      key={idx}
-                      onClick={async () => {
-                        try {
-                          const j = await ApiService.getJobById(String(rec.job_id));
-                          if (j) {
-                            setDetailJob(j);
-                            setIsDetailOpen(true);
-                          }
-                        } catch (e) {
-                          console.warn("Could not fetch recommended job details", e);
-                        }
-                      }}
-                      className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-200/60 dark:border-slate-700/60 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
-                          {rec.job_title || rec.title || `Role #${String(rec.job_id).slice(0, 8)}`}
-                        </span>
-                        <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-950 px-1.5 py-0.5 rounded">
-                          {Math.round(rec.match_score ?? rec.match_percentage ?? 88)}% Match
-                        </span>
-                      </div>
-                      {rec.location && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 truncate">
-                          {rec.location}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
           </div>
         </div>
 

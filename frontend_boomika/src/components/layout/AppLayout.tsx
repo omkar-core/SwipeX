@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { TopNav, TabType } from './TopNav';
 import { LeftSidebar } from './LeftSidebar';
 import { DiscoverScreen } from '../discover/DiscoverScreen';
-import { CompaniesScreen } from '../companies/CompaniesScreen';
 import { ApplicationsScreen } from '../applications/ApplicationsScreen';
 import { UploadResumeScreen } from '../resume/UploadResumeScreen';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +14,7 @@ import { JobPostingsList } from '../recruiter/JobPostingsList';
 import { CandidatePipeline } from '../recruiter/CandidatePipeline';
 import { RecruiterAnalytics } from '../recruiter/RecruiterAnalytics';
 import { AnalyticsScreen } from '../analytics/AnalyticsScreen';
+import { AtsScoreDashboard } from '../ats/AtsScoreDashboard';
 import { useRecruiter } from '../../context/RecruiterContext';
 import { MessageSquare, BarChart3, Users, Building, ShieldAlert, Zap, Sparkles, UserCheck, Briefcase } from 'lucide-react';
 
@@ -35,11 +35,11 @@ export const AppLayout: React.FC = () => {
   React.useEffect(() => {
     if (currentRole === 'recruiter') {
       setActiveTab(prev => 
-        prev === 'discover' || prev === 'applications' || prev === 'resume' 
+        prev === 'discover' || prev === 'applications' || prev === 'resume' || prev === 'ats-dashboard'
           ? 'recruiter-dashboard' 
           : prev
       );
-    } else if (currentRole === 'job_seeker') {
+    } else if (currentRole === 'candidate') {
       setActiveTab(prev => 
         prev === 'recruiter-dashboard' || prev === 'recruiter-post-job' || prev === 'recruiter-pipeline' || prev === 'recruiter-jobs'
           ? 'discover' 
@@ -84,6 +84,7 @@ export const AppLayout: React.FC = () => {
   // Determine if we should show left sidebar
   const isSidebarLayout = 
     activeTab === 'applications' || 
+    activeTab === 'ats-dashboard' ||
     activeTab === 'resume' || 
     activeTab === 'messages' || 
     activeTab === 'analytics' || 
@@ -97,7 +98,7 @@ export const AppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F4F7FB] dark:bg-[#0F1629] flex flex-col font-sans">
       {/* Role Notice Banner (if logged in as Recruiter or Admin) */}
-      {currentRole !== 'job_seeker' && (
+      {currentRole !== 'candidate' && (
         <div className="bg-slate-900 text-white px-4 py-1.5 text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="bg-blue-600 text-white text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded">
@@ -193,11 +194,18 @@ export const AppLayout: React.FC = () => {
             /* Candidate-Facing Views (Untouched) */
             <>
               {activeTab === 'discover' && <DiscoverScreen />}
-              {activeTab === 'companies' && <CompaniesScreen />}
               {activeTab === 'applications' && (
                 <ApplicationsScreen onNavigateToResume={() => setActiveTab('resume')} />
               )}
-              {activeTab === 'resume' && <UploadResumeScreen />}
+              {activeTab === 'ats-dashboard' && (
+                <AtsScoreDashboard
+                  onNavigateToResume={() => setActiveTab('resume')}
+                  onNavigateToJobs={() => setActiveTab('discover')}
+                />
+              )}
+              {activeTab === 'resume' && (
+                <UploadResumeScreen onNavigateToAts={() => setActiveTab('ats-dashboard')} />
+              )}
               {activeTab === 'profile' && (
                 <ProfileEditScreen
                   onSaved={() => setActiveTab('discover')}
@@ -209,13 +217,13 @@ export const AppLayout: React.FC = () => {
                   <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                     <MessageSquare className="w-8 h-8" />
                   </div>
-                  <h2 className="text-xl font-bold text-slate-900">Direct Recruiter Conversations</h2>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Direct Recruiter Conversations</h2>
                   <p className="text-slate-500 text-sm mt-2 max-w-md mx-auto">
                     Once a company accepts your swipe or schedules an interview, their hiring team will connect here directly.
                   </p>
                   <button
                     onClick={() => setActiveTab('discover')}
-                    className="mt-6 px-5 py-2.5 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700"
+                    className="mt-6 px-5 py-2.5 bg-blue-600 text-white rounded-md text-xs font-semibold hover:bg-blue-700 cursor-pointer"
                   >
                     Continue Discovering Roles
                   </button>
@@ -298,12 +306,12 @@ export const AppLayout: React.FC = () => {
               2. Discover (Swipe)
             </button>
             <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('applications'); }}
+              onClick={() => { setShowAuthPreview(false); setActiveTab('ats-dashboard'); }}
               className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'applications' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                !showAuthPreview && activeTab === 'ats-dashboard' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
-              3. Applications
+              3. ATS Score Matrix
             </button>
             <button
               onClick={() => { setShowAuthPreview(false); setActiveTab('resume'); }}
@@ -311,15 +319,15 @@ export const AppLayout: React.FC = () => {
                 !showAuthPreview && activeTab === 'resume' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
-              4. Upload Resume
+              4. Resume Versions
             </button>
             <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('profile'); }}
+              onClick={() => { setShowAuthPreview(false); setActiveTab('applications'); }}
               className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'profile' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                !showAuthPreview && activeTab === 'applications' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
-              5. Profile
+              5. Pipeline
             </button>
             <button
               onClick={() => { setShowAuthPreview(false); setActiveTab('analytics'); }}

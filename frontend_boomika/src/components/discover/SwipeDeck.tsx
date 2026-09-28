@@ -142,7 +142,7 @@ export const SwipeDeck: React.FC<SwipeDeckProps> = ({
             className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Reset Job Deck</span>
+            <span>Reset Mock Deck</span>
           </button>
         </div>
       </div>

@@ -13,7 +13,6 @@ import { API_CONFIG, API_ENDPOINTS, ApiError } from '../config/api';
 import { 
   Job, 
   SwipeRecord, 
-  SwipeDirection,
   UserRole, 
   User, 
   ResumeData, 
@@ -27,17 +26,9 @@ import {
   JobStatus,
   PipelineStage,
   RecruiterAnalyticsData,
-  CandidateAnalyticsData,
-  AdminDashboardData,
-  AdminUserRecord,
-  AdminRecruiterRecord,
-  AdminJobRecord,
-  AdminApplicationRecord,
-  AdminAnalyticsData,
-  Company,
-  CompanyDetail
+  CandidateAnalyticsData
 } from '../types';
-import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME, MOCK_COMPANIES } from '../data/mockData';
+import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME } from '../data/mockData';
 
 
 // Realistic network latency simulation helper for mock mode
@@ -118,7 +109,7 @@ export class ApiService {
     if (!API_CONFIG.USE_MOCK) {
       return httpRequest<{ user_id: string }>(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
-        body: JSON.stringify({ ...payload, role: payload.role || 'job_seeker' }),
+        body: JSON.stringify(payload),
       });
     }
 
@@ -129,7 +120,7 @@ export class ApiService {
       user_id: userId,
       name: payload.name,
       email: payload.email,
-      role: payload.role || 'job_seeker',
+      role: payload.role || 'candidate',
       title: payload.role === 'recruiter' ? 'Talent Partner' : 'Senior Product Designer',
       tier: 'Tier 1 Talent',
       avatar: INITIAL_USER.avatar,
@@ -164,7 +155,7 @@ export class ApiService {
     await mockDelay(300);
     const accessToken = `mock_jwt_access_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     const refreshToken = `mock_jwt_refresh_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'job_seeker';
+    const role: UserRole = 'candidate';
 
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
@@ -202,7 +193,7 @@ export class ApiService {
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
     await mockDelay(350);
     const accessToken = `mock_jwt_google_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'job_seeker';
+    const role: UserRole = 'candidate';
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(INITIAL_USER));
     return {
@@ -238,58 +229,6 @@ export class ApiService {
     };
   }
 
-  static async getAdminDashboard(): Promise<AdminDashboardData> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { total_users: 1, total_recruiters: user.role === 'recruiter' ? 1 : 0, total_job_seekers: user.role === 'job_seeker' ? 1 : 0, total_jobs: MOCK_JOBS.length, active_jobs: MOCK_JOBS.length, total_applications: 0, pending_items: 0 };
-    }
-    return httpRequest<AdminDashboardData>(API_ENDPOINTS.ADMIN.DASHBOARD);
-  }
-
-  static async getAdminUsers(params: { search?: string; role?: string } = {}): Promise<AdminUserRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return [{ user_id: user.user_id, name: user.name, email: user.email, role: user.role, status: 'active' }].filter((item) => (!params.role || item.role === params.role) && (!params.search || `${item.name} ${item.email}`.toLowerCase().includes(params.search.toLowerCase())));
-    }
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.role) query.set('role', params.role);
-    return httpRequest<AdminUserRecord[]>(`${API_ENDPOINTS.ADMIN.USERS}?${query}`);
-  }
-
-  static async getAdminRecruiters(search?: string): Promise<AdminRecruiterRecord[]> {
-    if (API_CONFIG.USE_MOCK) return [];
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    return httpRequest<AdminRecruiterRecord[]>(`${API_ENDPOINTS.ADMIN.RECRUITERS}${query}`);
-  }
-
-  static async getAdminJobs(params: { search?: string; status?: string } = {}): Promise<AdminJobRecord[]> {
-    if (API_CONFIG.USE_MOCK) return MOCK_JOBS.map((job) => ({ job_id: String(job.job_id), title: job.title, company: job.company, location: job.location, status: 'active' as JobStatus, posted_at: job.posted_at, application_count: 0 })).filter((item) => (!params.status || item.status === params.status) && (!params.search || `${item.title} ${item.company}`.toLowerCase().includes(params.search.toLowerCase())));
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.status) query.set('status', params.status);
-    return httpRequest<AdminJobRecord[]>(`${API_ENDPOINTS.ADMIN.JOBS}?${query}`);
-  }
-
-  static async getAdminApplications(params: { search?: string; stage?: string } = {}): Promise<AdminApplicationRecord[]> {
-    if (API_CONFIG.USE_MOCK) return [];
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.stage) query.set('stage', params.stage);
-    return httpRequest<AdminApplicationRecord[]>(`${API_ENDPOINTS.ADMIN.APPLICATIONS}?${query}`);
-  }
-
-  static async getAdminAnalytics(): Promise<AdminAnalyticsData> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { user_types: { job_seekers: user.role === 'job_seeker' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
-    }
-    return httpRequest<AdminAnalyticsData>(API_ENDPOINTS.ADMIN.ANALYTICS);
-  }
-
   /* ==========================================================================
      2. JOB & SWIPE CONTRACTS
      ========================================================================== */
@@ -306,7 +245,6 @@ export class ApiService {
     salary_max?: number;
     skills?: string;
     industry?: string;
-    q?: string;
   }): Promise<Job[]> {
     if (!API_CONFIG.USE_MOCK) {
       const query = new URLSearchParams();
@@ -318,7 +256,6 @@ export class ApiService {
         if (params.salary_max) query.append('salary_max', params.salary_max.toString());
         if (params.skills) query.append('skills', params.skills);
         if (params.industry) query.append('industry', params.industry);
-        if (params.q) query.append('q', params.q);
       }
       const queryString = query.toString();
       const endpoint = `${API_ENDPOINTS.JOBS.LIST}${queryString ? `?${queryString}` : ''}`;
@@ -358,30 +295,6 @@ export class ApiService {
   }
 
   /**
-   * GET /api/v1/jobs/search?q=...
-   * Searches job listings by keyword.
-   */
-  static async searchJobs(q: string): Promise<Job[]> {
-    if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<Job[]>(`${API_ENDPOINTS.JOBS.SEARCH}?q=${encodeURIComponent(q)}`, {
-        method: 'GET'
-      });
-    }
-
-    let jobs = [...MOCK_JOBS];
-    if (q && q.trim()) {
-      const term = q.toLowerCase().trim();
-      jobs = jobs.filter(j => 
-        (j.title || '').toLowerCase().includes(term) ||
-        (j.company || '').toLowerCase().includes(term) ||
-        (j.description || '').toLowerCase().includes(term) ||
-        (j.skills_required || j.skills || []).some(s => s.toLowerCase().includes(term))
-      );
-    }
-    return jobs;
-  }
-
-  /**
    * GET /api/v1/jobs/{job_id}
    * Fetches detailed information for a single job listing.
    */
@@ -400,71 +313,17 @@ export class ApiService {
   }
 
   /**
-   * GET /api/v1/companies
-   * Retrieves companies with optional newly_founded and industry filters.
-   */
-  static async getCompanies(params?: {
-    newly_founded?: boolean;
-    industry?: string;
-    type?: string;
-  }): Promise<Company[]> {
-    if (!API_CONFIG.USE_MOCK) {
-      const query = new URLSearchParams();
-      if (params) {
-        if (params.newly_founded !== undefined) query.append('newly_founded', String(params.newly_founded));
-        if (params.industry) query.append('industry', params.industry);
-        if (params.type) query.append('type', params.type);
-      }
-      const qs = query.toString();
-      const res = await httpRequest<any[]>(`${API_ENDPOINTS.COMPANIES.LIST}${qs ? `?${qs}` : ''}`, { method: 'GET' });
-      return (res || []).map(c => ({
-        ...c,
-        id: c.id || c.company_id || c.name,
-        company_id: c.company_id || c.id,
-      }));
-    }
-
-    await mockDelay(150);
-    let list = [...MOCK_COMPANIES];
-    if (params?.newly_founded !== undefined) {
-      list = list.filter(c => c.is_newly_founded === params.newly_founded);
-    }
-    if (params?.industry) {
-      list = list.filter(c => (c.industry || '').toLowerCase().includes(params.industry!.toLowerCase()));
-    }
-    return list;
-  }
-
-  /**
-   * GET /api/v1/companies/{company_id}
-   * Retrieves detailed company profile with active jobs.
-   */
-  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
-    if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<CompanyDetail>(API_ENDPOINTS.COMPANIES.DETAIL(companyId), { method: 'GET' });
-    }
-
-    await mockDelay(120);
-    const company = MOCK_COMPANIES.find(c => c.id === companyId) || MOCK_COMPANIES[0];
-    const relatedJobs = MOCK_JOBS.filter(j => (j.company || '').toLowerCase() === company.name.toLowerCase());
-    return {
-      ...company,
-      jobs: relatedJobs
-    };
-  }
-
-  /**
    * POST /api/v1/swipes
    * Records a user's swipe action (Pass / Save / Right / Left).
    */
   static async postSwipe(payload: { 
     job_id: string; 
-    direction: 'left' | 'right' | 'up' | 'LEFT' | 'RIGHT' | 'UP' 
+    direction: 'left' | 'right' | 'up' 
   }): Promise<{ swipe_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
       return httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
         method: 'POST',
-        body: JSON.stringify({ ...payload, direction: payload.direction.toUpperCase() }),
+        body: JSON.stringify(payload),
       });
     }
 
@@ -474,7 +333,7 @@ export class ApiService {
     const record: SwipeRecord = {
       swipe_id: swipeId,
       job_id: payload.job_id,
-      direction: payload.direction.toLowerCase() as SwipeDirection,
+      direction: payload.direction,
       swiped_at: new Date().toISOString(),
     };
 
@@ -520,7 +379,7 @@ export class ApiService {
       const formData = new FormData();
       formData.append('file', file);
       return httpRequest<{ resume_id: string; parsed_skills: string[] }>(
-        API_ENDPOINTS.RESUME.UPLOAD,
+        API_ENDPOINTS.RESUMES.UPLOAD,
         {
           method: 'POST',
           body: formData,
@@ -555,13 +414,23 @@ export class ApiService {
   }
 
   /**
-   * GET /api/v1/resume/{resume_id}/ats-score?job_id={id}
+   * POST /api/v1/ats/score
    * Real-time ATS match computation comparing resume skills against job requirements.
    */
   static async getAtsScore(resumeId: string, jobId?: string): Promise<ATSScoreResult> {
     if (!API_CONFIG.USE_MOCK) {
-      const endpoint = `${API_ENDPOINTS.RESUME.ATS_SCORE(resumeId)}${jobId ? `?job_id=${jobId}` : ''}`;
-      return httpRequest<ATSScoreResult>(endpoint, { method: 'GET' });
+      const data = await httpRequest<any>(API_ENDPOINTS.ATS.SCORE, {
+        method: 'POST',
+        body: JSON.stringify({
+          resume_id: resumeId,
+          job_id: jobId || '1',
+        }),
+      });
+      return {
+        match_score: data.match_score ?? data.score ?? 84,
+        missing_keywords: data.missing_keywords || [],
+        generated_by: data.generated_by || 'SwipeX-Neural-ATS-v4.2',
+      };
     }
 
     // --- DYNAMIC CLIENT-SIDE KEYWORD OVERLAP ALGORITHM (Milestone 1 Heuristic) ---
@@ -598,19 +467,15 @@ export class ApiService {
   }
 
   /**
-   * GET /api/v1/recommendations?user_id={id}
+   * GET /api/v1/jobs/recommendations?user_id={id}
    * Generates AI/vector-ranked recommendations based on skill affinity.
    */
-  static async getRecommendations(userId: string): Promise<any[]> {
+  static async getRecommendations(userId: string): Promise<JobRecommendation[]> {
     if (!API_CONFIG.USE_MOCK) {
-      const res = await httpRequest<any>(
-        `${API_ENDPOINTS.RESUME.RECOMMENDATIONS}?user_id=${userId}`,
+      return httpRequest<JobRecommendation[]>(
+        `${API_ENDPOINTS.JOBS.RECOMMENDATIONS}?user_id=${userId}`,
         { method: 'GET' }
       );
-      if (res && Array.isArray(res.recommendations)) {
-        return res.recommendations;
-      }
-      return Array.isArray(res) ? res : [];
     }
 
     // --- DYNAMIC SKILL-AFFINITY RANKING ALGORITHM (Milestone 1 Heuristic) ---

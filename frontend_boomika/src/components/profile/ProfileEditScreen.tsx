@@ -75,26 +75,6 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ onCancel, 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Fetch Profile on Mount
-  const fetchProfile = async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const data = await ProfileApiService.getProfile();
-      setOriginalProfile(data);
-      populateForm(data);
-    } catch (err: any) {
-      setLoadError(err.message || 'Failed to load profile data.');
-      showToast('Could not load profile. Please try again.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   const populateForm = (data: UserProfile) => {
     setName(data.name || '');
     setEmail(data.email || '');
@@ -117,6 +97,27 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ onCancel, 
 
     setErrors({});
   };
+
+  // 1. Fetch Profile on Mount
+  const fetchProfile = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const data = await ProfileApiService.getProfile();
+      setOriginalProfile(data);
+      populateForm(data);
+    } catch (err: any) {
+      setLoadError(err.message || 'Failed to load profile data.');
+      showToast('Could not load profile. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 2. Client-Side Validation
   const validateForm = (): boolean => {

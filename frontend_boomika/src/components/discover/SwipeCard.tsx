@@ -3,15 +3,17 @@ import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { MapPin, DollarSign, X, Heart, Box, ArrowLeftRight, Flame } from 'lucide-react';
 import { Job } from '../../types';
 import { getJobImage } from '../../utils/getJobImage';
+import { AiMatchBadge } from './AiMatchBadge';
 
 interface SwipeCardProps {
   job: Job;
+  match_percentage?: number;
   onSwipe: (direction: 'left' | 'right') => void;
   onSave: () => void;
   onPass: () => void;
 }
 
-export const SwipeCard: React.FC<SwipeCardProps> = ({ job, onSwipe, onSave, onPass }) => {
+export const SwipeCard: React.FC<SwipeCardProps> = ({ job, match_percentage, onSwipe, onSave, onPass }) => {
   const [exitX, setExitX] = useState<number | null>(null);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-16, 16]);
@@ -44,6 +46,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ job, onSwipe, onSave, onPa
   const displaySkills = job.skills_required && job.skills_required.length > 0 
     ? job.skills_required 
     : (job.skills || job.tags || ['Design', 'Technology', 'Product']);
+
+  const effectiveMatchScore = match_percentage ?? job.match_score ?? job.ats_match_score;
 
   return (
     <motion.div
@@ -85,7 +89,7 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ job, onSwipe, onSave, onPa
 
       {/* Content Area */}
       <div className="p-6 sm:p-7 relative pt-5">
-        {/* Floating Brand Badge & Hot Match Tag */}
+        {/* Floating Brand Badge & Hot Match Tag / AI Match % */}
         <div className="absolute -top-7 left-6 right-6 flex items-end justify-between pointer-events-none">
           <div className="w-14 h-14 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center p-2">
             <div className="w-full h-full bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 font-extrabold text-lg">
@@ -93,12 +97,15 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ job, onSwipe, onSave, onPa
             </div>
           </div>
 
-          {job.is_hot_match && (
-            <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold text-[11px] px-3 py-1 rounded-full shadow-md flex items-center gap-1">
-              <Flame className="w-3.5 h-3.5 fill-white" />
-              <span>Hot Match</span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            <AiMatchBadge match_percentage={effectiveMatchScore} />
+            {job.is_hot_match && (
+              <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold text-[11px] px-3 py-1 rounded-full shadow-md flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 fill-white" />
+                <span>Hot Match</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Title & Company */}

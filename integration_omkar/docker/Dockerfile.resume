@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir \
     python-dotenv==1.0.1
 
 COPY integration_omkar/docker/shim/ /usr/local/lib/python3.11/site-packages/
+COPY integration_omkar/docker/shim/sentence_transformers/ /app/sentence_transformers/
 COPY aiml_hemalatha/ /app/
 
 EXPOSE 8003

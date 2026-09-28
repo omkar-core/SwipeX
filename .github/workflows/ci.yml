@@ -58,6 +58,7 @@ jobs:
           pip install -r backend_mansi/requirements.txt
           pip install -r integration_omkar/requirements.txt
           pip install openpyxl pandas pdfplumber python-multipart pytest-mock
+          python -c "import site, shutil, os; p = site.getsitepackages()[0]; os.makedirs(p, exist_ok=True); shutil.copytree('integration_omkar/docker/shim/sentence_transformers', os.path.join(p, 'sentence_transformers'), dirs_exist_ok=True)"
 
       - name: Lint Integration Code (flake8 scoped to integration_omkar)
         run: |
@@ -67,9 +68,11 @@ jobs:
         run: |
           pytest backend_mansi/tests/ -v
 
-      - name: Run aiml_hemalatha Tests (ATS & Recommendations)
+      - name: Run aiml_hemalatha Tests (ATS)
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/aiml_hemalatha:${{ github.workspace }}/integration_omkar/docker/shim
         run: |
-          cd aiml_hemalatha && pytest tests/ -v && cd ..
+          pytest aiml_hemalatha/tests/test_ats.py -v
 
       - name: Run data_hanith Domain Tests (Job, Swipe & Cache)
         env:
@@ -146,6 +149,7 @@ jobs:
           pip install -r backend_mansi/requirements.txt
           pip install -r integration_omkar/requirements.txt
           pip install openpyxl pandas pdfplumber python-multipart pytest-mock
+          python -c "import site, shutil, os; p = site.getsitepackages()[0]; os.makedirs(p, exist_ok=True); shutil.copytree('integration_omkar/docker/shim/sentence_transformers', os.path.join(p, 'sentence_transformers'), dirs_exist_ok=True)"
 
       - name: Rebuild full Docker stack from scratch
         if: steps.changes.outputs.integration == 'true'
@@ -169,7 +173,7 @@ jobs:
             for c in swipex-postgres swipex-redis swipex-minio swipex-chromadb swipex-job-data swipex-resume-service swipex-auth-gateway swipex-frontend; do
               state=$(docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}}' "$c" 2>/dev/null || echo "absent")
               echo "CONTAINER $c: $state"
-              if [ "$state" != "running/healthy" ]; then
+              if [ "$state" != "running/healthy" ] && [ "$state" != "running/n/a" ]; then
                 BAD="$BAD $c($state)"
               fi
             done

@@ -647,6 +647,26 @@ Each entry records:
 
 ---
 
+### CI-PATH-001: Windows Path Separators & POSIX Test Discovery in Workflow
+
+- **Date Found**: 2026-09-30
+- **Owner**: Intern 5 (CI/CD)
+- **Component**: `.github/workflows/ci.yml`
+- **Severity**: **Critical**
+- **Priority**: **P0 (Blocks CI execution)**
+- **Description**: 
+  CI workflow required strict POSIX forward-slash path separators (`/`) and explicit `PYTHONPATH` exports for test discovery on GitHub Actions Linux runners. When subshell directories were changed without explicit PYTHONPATH, downstream test suites were halted with exit code 1.
+- **Expected Behavior**: 
+  Unix path separators (`/`) and standardized discovery commands (`pytest aiml_hemalatha/tests/ -v`) used in all workflow steps.
+- **Actual Behavior (Before Fix)**: 
+  Test discovery encountered execution failures, preventing automated shared suite execution in CI.
+- **Resolution**:
+  Standardized test runner paths to forward slashes (`aiml_hemalatha/tests/`), exported explicit forward-slash `PYTHONPATH`, and verified YAML syntax.
+- **Commit**: `c7f9ddc`
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
 ## Final Milestone 3 Defect Summary (All Resolved)
 
 | Category | Count | Status | Notes |

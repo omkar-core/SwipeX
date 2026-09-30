@@ -76,15 +76,11 @@ services:
       CHROMADB_PORT: 8000
     volumes:
       - resume_uploads:/app/uploads/resumes
-    depends_on:
-      minio:
-        condition: service_started
-      chromadb:
-        condition: service_started
     networks:
       - swipex-network
 
   minio:
+    profiles: ["storage"]
     image: minio/minio:latest
     container_name: swipex-minio
     restart: unless-stopped
@@ -106,6 +102,7 @@ services:
       - swipex-network
 
   chromadb:
+    profiles: ["storage"]
     image: chromadb/chroma:0.5.5
     container_name: swipex-chromadb
     restart: unless-stopped

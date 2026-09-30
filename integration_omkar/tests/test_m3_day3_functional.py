@@ -29,6 +29,19 @@ import httpx
 TIMEOUT_UPLOAD = 15.0   # Resume uploads may be slower due to MinIO writes
 TIMEOUT_STD    = 10.0
 
+VALID_TEST_PDF_BYTES = (
+    b"%PDF-1.4\n"
+    b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
+    b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n"
+    b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n"
+    b"4 0 obj << /Length 55 >> stream\n"
+    b"BT /F1 12 Tf 72 712 Td (Python Developer with FastAPI Docker experience) Tj ET\n"
+    b"endstream endobj\n"
+    b"5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n"
+    b"xref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000234 00000 n \n0000000340 00000 n \n"
+    b"trailer << /Size 6 /Root 1 0 R >>\nstartxref\n420\n%%EOF"
+)
+
 
 def _skip_if_down(gateway_url: str) -> None:
     """Soft-skip this test if the live stack is not reachable."""
@@ -54,11 +67,7 @@ def test_d3_fn_01_resume_upload_pdf_returns_201(gateway_url, test_job_seeker):
     _skip_if_down(gateway_url)
     headers = {k: v for k, v in test_job_seeker["headers"].items()
                if k.lower() != "content-type"}
-    resume_bytes = (
-        b"%PDF-1.4\n1 0 obj\n<< /Title (D3 Functional Test Resume) >>\nendobj\n"
-        b"trailer\n<< /Root 1 0 R >>\n%%EOF"
-    )
-    files = {"file": ("d3_functional_test.pdf", io.BytesIO(resume_bytes), "application/pdf")}
+    files = {"file": ("d3_functional_test.pdf", io.BytesIO(VALID_TEST_PDF_BYTES), "application/pdf")}
 
     res = httpx.post(
         f"{gateway_url}/api/v1/resumes/upload",
@@ -158,11 +167,7 @@ def test_d3_fn_06_upload_then_list_contains_upload(gateway_url, test_job_seeker)
     _skip_if_down(gateway_url)
     headers = {k: v for k, v in test_job_seeker["headers"].items()
                if k.lower() != "content-type"}
-    resume_bytes = (
-        b"%PDF-1.4\n1 0 obj\n<< /Title (D3 List Consistency Test) >>\nendobj\n"
-        b"trailer\n<< /Root 1 0 R >>\n%%EOF"
-    )
-    files = {"file": ("d3_list_test.pdf", io.BytesIO(resume_bytes), "application/pdf")}
+    files = {"file": ("d3_list_test.pdf", io.BytesIO(VALID_TEST_PDF_BYTES), "application/pdf")}
 
     upload_res = httpx.post(
         f"{gateway_url}/api/v1/resumes/upload",
@@ -209,11 +214,7 @@ def test_d3_fn_07_parse_trigger_endpoint(gateway_url, test_job_seeker):
                if k.lower() != "content-type"}
 
     # First upload a resume to get a valid ID
-    resume_bytes = (
-        b"%PDF-1.4\n1 0 obj\n<< /Title (Parse Trigger Test) >>\nendobj\n"
-        b"trailer\n<< /Root 1 0 R >>\n%%EOF"
-    )
-    files = {"file": ("parse_trigger_test.pdf", io.BytesIO(resume_bytes), "application/pdf")}
+    files = {"file": ("parse_trigger_test.pdf", io.BytesIO(VALID_TEST_PDF_BYTES), "application/pdf")}
     upload_res = httpx.post(
         f"{gateway_url}/api/v1/resumes/upload",
         files=files,
@@ -263,11 +264,7 @@ def test_d3_fn_08_resume_detail_by_id(gateway_url, test_job_seeker):
     headers = {k: v for k, v in test_job_seeker["headers"].items()
                if k.lower() != "content-type"}
 
-    resume_bytes = (
-        b"%PDF-1.4\n1 0 obj\n<< /Title (Detail Lookup Test) >>\nendobj\n"
-        b"trailer\n<< /Root 1 0 R >>\n%%EOF"
-    )
-    files = {"file": ("detail_lookup.pdf", io.BytesIO(resume_bytes), "application/pdf")}
+    files = {"file": ("detail_lookup.pdf", io.BytesIO(VALID_TEST_PDF_BYTES), "application/pdf")}
     upload_res = httpx.post(
         f"{gateway_url}/api/v1/resumes/upload",
         files=files,
@@ -312,11 +309,7 @@ def test_d3_fn_09_ats_score_endpoint(gateway_url, test_job_seeker):
                if k.lower() != "content-type"}
 
     # Step 1 — Upload resume
-    resume_bytes = (
-        b"%PDF-1.4\n1 0 obj\n<< /Title (ATS Score Test Resume) >>\nendobj\n"
-        b"trailer\n<< /Root 1 0 R >>\n%%EOF"
-    )
-    files = {"file": ("ats_score_test.pdf", io.BytesIO(resume_bytes), "application/pdf")}
+    files = {"file": ("ats_score_test.pdf", io.BytesIO(VALID_TEST_PDF_BYTES), "application/pdf")}
     upload_res = httpx.post(
         f"{gateway_url}/api/v1/resumes/upload",
         files=files,

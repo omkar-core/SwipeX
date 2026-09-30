@@ -76,9 +76,11 @@ def get_recommendations(
 
         semantic_score = semantic_similarity * 100
 
+        target_job_id = str(job.get("job_id") if hasattr(job, "get") else getattr(job, "job_id", "job_1"))
+
         swipe_score = get_swipe_score(
             user_id,
-            job["job_id"]
+            target_job_id
         )
 
         recommendation_score = (
@@ -115,7 +117,7 @@ def get_recommendations(
         )
 
         recommendation = {
-            "job_id": str(job["job_id"]),
+            "job_id": target_job_id,
             "title": str(job_title),
 
             "required_skills":
@@ -137,6 +139,9 @@ def get_recommendations(
                 swipe_score,
 
             "recommendation_score":
+                round(recommendation_score, 2),
+
+            "match_score":
                 round(recommendation_score, 2),
 
             "reason_tags":

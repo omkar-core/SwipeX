@@ -37,6 +37,10 @@ def load_job_data():
 
     df = df.rename(columns=column_mapping)
 
+    if "job_id" not in df.columns:
+        import uuid
+        df["job_id"] = [str(uuid.uuid5(uuid.NAMESPACE_DNS, f"swipex-job-{i+1}")) for i in range(len(df))]
+
     # Generate required skills from job title
     df["required_skills"] = df["job_title"].apply(
         get_required_skills

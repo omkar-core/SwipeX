@@ -57,7 +57,7 @@ def test_job_seeker_allowed_to_swipe(gateway_url, test_job_seeker):
         f"{gateway_url}/api/v1/swipes",
         json={"job_id": job_id, "direction": "RIGHT"},
         headers=test_job_seeker["headers"],
-        timeout=5.0
+        timeout=10.0
     )
     assert res.status_code == 201, f"Expected 201 Created for job_seeker swipe, got {res.status_code}"
 

@@ -70,6 +70,5 @@ def test_resume_upload_ats_score_and_recommendations(gateway_url, test_job_seeke
     )
     assert recs_res.status_code == 200, f"Recommendations failed: {recs_res.status_code} - {recs_res.text}"
     recs_data = recs_res.json()
-    assert "recommendations" in recs_data
     assert isinstance(recs_data["recommendations"], list)
-    assert recs_data.get("generated_by") == "heuristic-v0"
+    assert recs_data.get("generated_by") in ("heuristic-v0", "semantic-swipe-v1")

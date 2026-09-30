@@ -17,12 +17,14 @@ RUN pip install --no-cache-dir \
     pandas==2.2.3 \
     numpy>=1.26.0 \
     pdfplumber==0.11.4 \
+    python-docx==1.2.0 \
     pydantic==2.9.2 \
     python-multipart==0.0.12 \
     python-dotenv==1.0.1
 
 COPY integration_omkar/docker/shim/ /usr/local/lib/python3.11/site-packages/
 COPY integration_omkar/docker/shim/sentence_transformers/ /app/sentence_transformers/
+COPY integration_omkar/docker/shim/sklearn/ /app/sklearn/
 COPY aiml_hemalatha/ /app/
 
 EXPOSE 8003

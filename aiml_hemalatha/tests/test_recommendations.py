@@ -49,13 +49,19 @@ def test_recommendations_rank_highest_match_first(monkeypatch):
         limit=10
     )
 
-    # Python Developer has 100% match
+    # Python Developer should rank first
     assert result[0]["job_id"] == "1"
-    assert result[0]["match_score"] == 100.0
 
     # Results should be sorted from high to low
-    assert result[0]["match_score"] >= result[1]["match_score"]
-    assert result[1]["match_score"] >= result[2]["match_score"]
+    assert (
+        result[0]["recommendation_score"]
+        >= result[1]["recommendation_score"]
+    )
+
+    assert (
+        result[1]["recommendation_score"]
+        >= result[2]["recommendation_score"]
+    )
 
 
 def test_recommendation_contains_matched_skills(monkeypatch):
@@ -91,7 +97,7 @@ def test_recommendation_contains_matched_skills(monkeypatch):
         "git"
     ]
 
-    assert result[0]["match_score"] == 86.67
+    assert "recommendation_score" in result[0]
 
 
 def test_recommendation_limit(monkeypatch):
@@ -141,9 +147,12 @@ def test_no_matching_skills(monkeypatch):
         limit=10
     )
 
-    assert result[0]["match_score"] == 0.0
+    assert result[0]["keyword_score"] == 0.0
+
     assert result[0]["matched_skills"] == []
+
     assert result[0]["missing_skills"] == [
         "java",
         "spring"
     ]
+

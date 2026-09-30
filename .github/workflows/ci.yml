@@ -72,7 +72,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/aiml_hemalatha:${{ github.workspace }}/integration_omkar/docker/shim
         run: |
-          pytest aiml_hemalatha/tests/test_ats.py -v
+          pytest aiml_hemalatha/tests/ -v
 
       - name: Run data_hanith Domain Tests (Job, Swipe & Cache)
         env:
@@ -244,9 +244,11 @@ jobs:
 
       - name: Run Resume/AI unit tests (aiml_hemalatha)
         if: steps.changes.outputs.integration == 'true'
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/aiml_hemalatha:${{ github.workspace }}/integration_omkar/docker/shim
         run: |
           set +e
-          (cd aiml_hemalatha && pytest tests/ -v) > /tmp/run-aiml.log 2>&1
+          pytest aiml_hemalatha/tests/ -v > /tmp/run-aiml.log 2>&1
           echo "$?" > /tmp/rc-aiml
           tail -n 30 /tmp/run-aiml.log
           exit 0

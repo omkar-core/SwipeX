@@ -93,6 +93,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+    window.addEventListener('swipex:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('swipex:unauthorized', handleUnauthorized);
+  }, [logout]);
+
   const switchRole = useCallback((newRole: UserRole) => {
     if (user) {
       const updatedUser: User = {

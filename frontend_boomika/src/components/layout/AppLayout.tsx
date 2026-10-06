@@ -1,47 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { TopNav, TabType } from './TopNav';
 import { LeftSidebar } from './LeftSidebar';
+import { MobileNavDrawer } from './MobileNavDrawer';
 import { DiscoverScreen } from '../discover/DiscoverScreen';
-import { ApplicationsScreen } from '../applications/ApplicationsScreen';
-import { UploadResumeScreen } from '../resume/UploadResumeScreen';
 import { useAuth } from '../../context/AuthContext';
 import { LoginScreen } from '../auth/LoginScreen';
 import { OnboardingWizard } from '../onboarding/OnboardingWizard';
-import { ProfileEditScreen } from '../profile/ProfileEditScreen';
-import { RecruiterDashboard } from '../recruiter/RecruiterDashboard';
-import { JobPostingForm } from '../recruiter/JobPostingForm';
-import { JobPostingsList } from '../recruiter/JobPostingsList';
-import { CandidatePipeline } from '../recruiter/CandidatePipeline';
-import { RecruiterAnalytics } from '../recruiter/RecruiterAnalytics';
-import { AnalyticsScreen } from '../analytics/AnalyticsScreen';
-import { AtsScoreDashboard } from '../ats/AtsScoreDashboard';
 import { useRecruiter } from '../../context/RecruiterContext';
-import { MessageSquare, BarChart3, Users, Building, ShieldAlert, Zap, Sparkles, UserCheck, Briefcase } from 'lucide-react';
+import { MessageSquare, Zap, Sparkles } from 'lucide-react';
 
+// Code splitting / Lazy-loaded heavy screen modules
+const ApplicationsScreen = React.lazy(() =>
+  import('../applications/ApplicationsScreen').then((m) => ({ default: m.ApplicationsScreen }))
+);
+const UploadResumeScreen = React.lazy(() =>
+  import('../resume/UploadResumeScreen').then((m) => ({ default: m.UploadResumeScreen }))
+);
+const ProfileEditScreen = React.lazy(() =>
+  import('../profile/ProfileEditScreen').then((m) => ({ default: m.ProfileEditScreen }))
+);
+const RecruiterDashboard = React.lazy(() =>
+  import('../recruiter/RecruiterDashboard').then((m) => ({ default: m.RecruiterDashboard }))
+);
+const JobPostingForm = React.lazy(() =>
+  import('../recruiter/JobPostingForm').then((m) => ({ default: m.JobPostingForm }))
+);
+const JobPostingsList = React.lazy(() =>
+  import('../recruiter/JobPostingsList').then((m) => ({ default: m.JobPostingsList }))
+);
+const CandidatePipeline = React.lazy(() =>
+  import('../recruiter/CandidatePipeline').then((m) => ({ default: m.CandidatePipeline }))
+);
+const RecruiterAnalytics = React.lazy(() =>
+  import('../recruiter/RecruiterAnalytics').then((m) => ({ default: m.RecruiterAnalytics }))
+);
+const AnalyticsScreen = React.lazy(() =>
+  import('../analytics/AnalyticsScreen').then((m) => ({ default: m.AnalyticsScreen }))
+);
+const AtsScoreDashboard = React.lazy(() =>
+  import('../ats/AtsScoreDashboard').then((m) => ({ default: m.AtsScoreDashboard }))
+);
+const NotificationsScreen = React.lazy(() =>
+  import('../notifications/NotificationsScreen').then((m) => ({ default: m.NotificationsScreen }))
+);
+const AlertPreferencesScreen = React.lazy(() =>
+  import('../notifications/AlertPreferencesScreen').then((m) => ({ default: m.AlertPreferencesScreen }))
+);
+const HiringTrendsScreen = React.lazy(() =>
+  import('../analytics/HiringTrendsScreen').then((m) => ({ default: m.HiringTrendsScreen }))
+);
+const AdminAnalyticsScreen = React.lazy(() =>
+  import('../admin/AdminAnalyticsScreen').then((m) => ({ default: m.AdminAnalyticsScreen }))
+);
+
+const ScreenSkeleton = () => (
+  <div
+    className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-pulse"
+    data-testid="screen-loading-skeleton"
+  >
+    <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-xl w-48" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="h-28 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+      <div className="h-28 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+      <div className="h-28 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+    </div>
+    <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+  </div>
+);
 
 export const AppLayout: React.FC = () => {
   const { isAuthenticated, isLoading, currentRole, logout } = useAuth();
   const { setSelectedJobId } = useRecruiter();
   const [activeTab, setActiveTab] = useState<TabType>(() => {
-    return currentRole === 'recruiter' ? 'recruiter-dashboard' : 'discover';
+    if (currentRole === 'admin') return 'admin-analytics';
+    if (currentRole === 'recruiter') return 'recruiter-dashboard';
+    return 'discover';
   });
   const [showAuthPreview, setShowAuthPreview] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   // Feature 8: Onboarding Skills Wizard state
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     return localStorage.getItem('swipex_onboarded') !== 'true';
   });
 
+  const showDevTools = import.meta.env.VITE_SHOW_DEV_TOOLS === 'true' && !import.meta.env.PROD;
+
   // Sync default tab if currentRole changes
   React.useEffect(() => {
-    if (currentRole === 'recruiter') {
+    if (currentRole === 'admin') {
       setActiveTab(prev => 
         prev === 'discover' || prev === 'applications' || prev === 'resume' || prev === 'ats-dashboard'
+          ? 'admin-analytics' 
+          : prev
+      );
+    } else if (currentRole === 'recruiter') {
+      setActiveTab(prev => 
+        prev === 'discover' || prev === 'applications' || prev === 'resume' || prev === 'ats-dashboard' || prev === 'admin-analytics'
           ? 'recruiter-dashboard' 
           : prev
       );
     } else if (currentRole === 'candidate') {
       setActiveTab(prev => 
-        prev === 'recruiter-dashboard' || prev === 'recruiter-post-job' || prev === 'recruiter-pipeline' || prev === 'recruiter-jobs'
+        prev === 'recruiter-dashboard' || prev === 'recruiter-post-job' || prev === 'recruiter-pipeline' || prev === 'recruiter-jobs' || prev === 'admin-analytics'
           ? 'discover' 
           : prev
       );
@@ -92,7 +152,11 @@ export const AppLayout: React.FC = () => {
     activeTab === 'recruiter-dashboard' ||
     activeTab === 'recruiter-post-job' ||
     activeTab === 'recruiter-pipeline' ||
-    activeTab === 'recruiter-jobs';
+    activeTab === 'recruiter-jobs' ||
+    activeTab === 'notifications' ||
+    activeTab === 'alert-settings' ||
+    activeTab === 'hiring-trends' ||
+    activeTab === 'admin-analytics';
 
 
   return (
@@ -120,20 +184,61 @@ export const AppLayout: React.FC = () => {
       )}
 
       {/* Top Navigation */}
-      <TopNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <TopNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onOpenMobileNav={() => setIsMobileNavOpen(true)}
+      />
+
+      {/* Mobile Slide-In Navigation Drawer */}
+      <MobileNavDrawer
+        isOpen={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       <div className="flex-1 flex w-full">
         {/* Left Sidebar if in Applications / Resume / Messages / Analytics / Recruiter view */}
         {isSidebarLayout && (
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             <LeftSidebar activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
         )}
 
         {/* Main Content Area */}
         <main className="flex-1 w-full overflow-x-hidden">
-          {/* Recruiter-Facing Views */}
-          {currentRole === 'recruiter' ? (
+          <Suspense fallback={<ScreenSkeleton />}>
+            {/* Admin-Facing Views */}
+          {currentRole === 'admin' ? (
+            <>
+              {(activeTab === 'admin-analytics' || activeTab === 'discover' || activeTab === 'recruiter-dashboard') && (
+                <AdminAnalyticsScreen />
+              )}
+              {activeTab === 'hiring-trends' && (
+                <HiringTrendsScreen onNavigateToJobs={() => setActiveTab('discover')} />
+              )}
+              {activeTab === 'recruiter-pipeline' && (
+                <CandidatePipeline />
+              )}
+              {activeTab === 'analytics' && (
+                <RecruiterAnalytics />
+              )}
+              {activeTab === 'notifications' && (
+                <NotificationsScreen onNavigateToSettings={() => setActiveTab('alert-settings')} />
+              )}
+              {activeTab === 'alert-settings' && (
+                <AlertPreferencesScreen onBack={() => setActiveTab('admin-analytics')} />
+              )}
+              {activeTab === 'profile' && (
+                <ProfileEditScreen
+                  onSaved={() => setActiveTab('admin-analytics')}
+                  onCancel={() => setActiveTab('admin-analytics')}
+                />
+              )}
+            </>
+          ) : currentRole === 'recruiter' ? (
+            /* Recruiter-Facing Views */
             <>
               {(activeTab === 'recruiter-dashboard' || activeTab === 'discover' || activeTab === 'applications' || activeTab === 'resume') && (
                 <RecruiterDashboard
@@ -166,6 +271,15 @@ export const AppLayout: React.FC = () => {
               {activeTab === 'analytics' && (
                 <RecruiterAnalytics />
               )}
+              {activeTab === 'hiring-trends' && (
+                <HiringTrendsScreen onNavigateToJobs={() => setActiveTab('recruiter-jobs')} />
+              )}
+              {activeTab === 'notifications' && (
+                <NotificationsScreen onNavigateToSettings={() => setActiveTab('alert-settings')} />
+              )}
+              {activeTab === 'alert-settings' && (
+                <AlertPreferencesScreen onBack={() => setActiveTab('recruiter-dashboard')} />
+              )}
               {activeTab === 'profile' && (
                 <ProfileEditScreen
                   onSaved={() => setActiveTab('recruiter-dashboard')}
@@ -191,7 +305,7 @@ export const AppLayout: React.FC = () => {
               )}
             </>
           ) : (
-            /* Candidate-Facing Views (Untouched) */
+            /* Candidate-Facing Views */
             <>
               {activeTab === 'discover' && <DiscoverScreen />}
               {activeTab === 'applications' && (
@@ -211,6 +325,19 @@ export const AppLayout: React.FC = () => {
                   onSaved={() => setActiveTab('discover')}
                   onCancel={() => setActiveTab('discover')}
                 />
+              )}
+              {activeTab === 'notifications' && (
+                <NotificationsScreen
+                  onNavigateToJob={() => setActiveTab('discover')}
+                  onNavigateToApplications={() => setActiveTab('applications')}
+                  onNavigateToSettings={() => setActiveTab('alert-settings')}
+                />
+              )}
+              {activeTab === 'alert-settings' && (
+                <AlertPreferencesScreen onBack={() => setActiveTab('discover')} />
+              )}
+              {activeTab === 'hiring-trends' && (
+                <HiringTrendsScreen onNavigateToJobs={() => setActiveTab('discover')} />
               )}
               {activeTab === 'messages' && (
                 <div className="max-w-4xl mx-auto px-4 py-12 text-center">
@@ -237,117 +364,123 @@ export const AppLayout: React.FC = () => {
               )}
             </>
           )}
+          </Suspense>
         </main>
       </div>
 
-      {/* Screen Switcher Floating Bar (for Milestone 1, 2, & Recruiter review) */}
-      <div className="fixed bottom-4 left-4 z-40 bg-white/95 dark:bg-[#111827]/95 backdrop-blur border border-slate-300/80 dark:border-slate-700 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-1 text-xs">
-        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 px-2 uppercase tracking-wider">
-          {currentRole === 'recruiter' ? 'Recruiter:' : 'Candidate:'}
-        </span>
-        
-        {currentRole === 'recruiter' ? (
-          <>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-dashboard'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'recruiter-dashboard' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              1. Dashboard
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-post-job'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'recruiter-post-job' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              2. Post a Job
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-pipeline'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'recruiter-pipeline' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              3. Candidates
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-jobs'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'recruiter-jobs' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              4. My Listings
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('analytics'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'analytics' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              5. Analytics
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={() => setShowAuthPreview(true)}
-              className="px-2.5 py-1 rounded-full font-semibold transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-            >
-              1. Login
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('discover'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'discover' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              2. Discover (Swipe)
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('ats-dashboard'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'ats-dashboard' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              3. ATS Score Matrix
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('resume'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'resume' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              4. Resume Versions
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('applications'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'applications' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              5. Pipeline
-            </button>
-            <button
-              onClick={() => { setShowAuthPreview(false); setActiveTab('analytics'); }}
-              className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                !showAuthPreview && activeTab === 'analytics' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              6. Analytics
-            </button>
-            <button
-              onClick={() => setShowOnboarding(true)}
-              className="px-2.5 py-1 rounded-full font-semibold transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center gap-1"
-              title="Personalize your discovery settings"
-            >
-              <Sparkles className="w-3 h-3" />
-              7. Onboarding
-            </button>
-          </>
-        )}
-      </div>
+      {/* Screen Switcher Floating Bar (for dev review only) */}
+      {showDevTools && (
+        <div
+          data-testid="dev-tools-switcher"
+          className="fixed bottom-4 left-4 z-40 bg-white/95 dark:bg-[#111827]/95 backdrop-blur border border-slate-300/80 dark:border-slate-700 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-1 text-xs"
+        >
+          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 px-2 uppercase tracking-wider">
+            {currentRole === 'recruiter' ? 'Recruiter:' : 'Candidate:'}
+          </span>
+          
+          {currentRole === 'recruiter' ? (
+            <>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-dashboard'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'recruiter-dashboard' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                1. Dashboard
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-post-job'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'recruiter-post-job' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                2. Post a Job
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-pipeline'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'recruiter-pipeline' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                3. Candidates
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('recruiter-jobs'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'recruiter-jobs' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                4. My Listings
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('analytics'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'analytics' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                5. Analytics
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowAuthPreview(true)}
+                className="px-2.5 py-1 rounded-full font-semibold transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+              >
+                1. Login
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('discover'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'discover' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                2. Discover (Swipe)
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('ats-dashboard'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'ats-dashboard' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                3. ATS Score Matrix
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('resume'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'resume' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                4. Resume Versions
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('applications'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'applications' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                5. Pipeline
+              </button>
+              <button
+                onClick={() => { setShowAuthPreview(false); setActiveTab('analytics'); }}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-colors ${
+                  !showAuthPreview && activeTab === 'analytics' ? 'bg-[#2563EB] text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                6. Analytics
+              </button>
+              <button
+                onClick={() => setShowOnboarding(true)}
+                className="px-2.5 py-1 rounded-full font-semibold transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center gap-1"
+                title="Personalize your discovery settings"
+              >
+                <Sparkles className="w-3 h-3" />
+                7. Onboarding
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
 
       {/* Feature 8 — Onboarding Skills Wizard */}

@@ -12,11 +12,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
   const { login, register, loginWithGoogle, isLoading } = useAuth();
   const { showToast } = useToast();
 
-  const [email, setEmail] = useState('user@company.com');
-  const [password, setPassword] = useState('••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [maintainSession, setMaintainSession] = useState(true);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [name, setName] = useState('Alex Mercer');
+  const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('candidate');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -293,6 +293,45 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
               </>
             )}
           </div>
+
+          {/* Dev Demo Credentials Quick Helper */}
+          {import.meta.env.DEV && (
+            <div className="mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2 text-slate-600">
+              <div className="font-bold text-slate-800 flex items-center justify-between">
+                <span>Demo Credentials</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-extrabold tracking-wider">DEV ONLY</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200">
+                <span>Candidate: <code className="font-mono font-medium text-slate-800">alex@swipex.io</code></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('alex@swipex.io');
+                    setPassword('Password123!');
+                    setIsRegisterMode(false);
+                  }}
+                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold cursor-pointer text-[11px] transition-colors"
+                >
+                  Auto-fill
+                </button>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span>Recruiter: <code className="font-mono font-medium text-slate-800">recruiter@swipex.io</code></span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('recruiter@swipex.io');
+                    setPassword('Password123!');
+                    setIsRegisterMode(false);
+                  }}
+                  className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold cursor-pointer text-[11px] transition-colors"
+                >
+                  Auto-fill
+                </button>
+              </div>
+              <div className="text-[10px] text-slate-400">Password: <code className="font-mono text-slate-600 font-medium">Password123!</code></div>
+            </div>
+          )}
         </div>
       </div>
     </div>

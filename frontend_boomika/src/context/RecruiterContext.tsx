@@ -8,6 +8,8 @@ import {
   RecruiterAnalyticsData 
 } from '../types';
 import { RecruiterApiService } from '../services/api';
+import { applicationService } from '../services/applicationService';
+import { toCanonicalStatus } from '../utils/applicationStatus';
 import { useToast } from './ToastContext';
 import { useAuth } from './AuthContext';
 
@@ -176,6 +178,12 @@ export const RecruiterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     try {
       await RecruiterApiService.updateApplicantStage(appId, newStage, notes);
+      try {
+        const canonical = toCanonicalStatus(newStage);
+        await applicationService.updateStatus(appId, canonical, notes, 'recruiter', true);
+      } catch {
+        // Suppress if candidate app ID is unmapped in mock store
+      }
       showToast(`Moved ${target.candidate.name} to ${newStage}`, 'info');
       fetchAnalytics();
     } catch (err: any) {

@@ -26,6 +26,9 @@ import { useResume } from '../../context/ResumeContext';
 import { useToast } from '../../context/ToastContext';
 import { ApiService } from '../../services/api';
 import { CandidateAnalyticsData } from '../../types';
+import { RecommendationInsightsPanel } from './RecommendationInsightsPanel';
+import { SwipeBehaviorSummary } from './SwipeBehaviorSummary';
+import { ResumePerformancePanel } from './ResumePerformancePanel';
 
 interface AnalyticsScreenProps {
   onNavigateToApplications?: () => void;
@@ -516,6 +519,12 @@ export const AnalyticsScreen: React.FC<AnalyticsScreenProps> = ({
 
           </div>
 
+          {/* ─── Resume Performance per Version (FR-06) ────────────────────── */}
+          <ResumePerformancePanel
+            performance={analyticsData?.resume_performance}
+            onNavigateToResume={onNavigateToResume}
+          />
+
           {/* ─── 5. Row 3: Skill Gap Insights & Industry Engagement ──────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
@@ -807,6 +816,18 @@ export const AnalyticsScreen: React.FC<AnalyticsScreenProps> = ({
               </div>
             </div>
 
+          </div>
+
+          {/* ─── 7. Swipe Discovery & Neural Recommendation Insights ──────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-5">
+              <SwipeBehaviorSummary />
+            </div>
+            <div className="lg:col-span-7">
+              <RecommendationInsightsPanel
+                onNavigateToJob={onNavigateToApplications}
+              />
+            </div>
           </div>
         </>
       )}

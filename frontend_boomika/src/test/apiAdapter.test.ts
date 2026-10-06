@@ -166,4 +166,205 @@ describe('ApiAdapter & Centralized Data Mapper', () => {
       expect(list[1].match_percentage).toBe(92);
     });
   });
+
+  describe('Notification & Preferences Normalization', () => {
+    it('normalizes raw notification DTO and decimal match percentages', () => {
+      const rawNotif = {
+        notification_id: 'notif_abc',
+        category: 'high_match',
+        heading: 'Top Match Role',
+        body: 'You scored 94% on Stripe posting',
+        match_score: 0.94,
+        is_read: false,
+      };
+
+      const normalized = ApiAdapter.toNotification(rawNotif);
+
+      expect(normalized.id).toBe('notif_abc');
+      expect(normalized.type).toBe('high_match');
+      expect(normalized.title).toBe('Top Match Role');
+      expect(normalized.message).toBe('You scored 94% on Stripe posting');
+      expect(normalized.match_percentage).toBe(94);
+      expect(normalized.read).toBe(false);
+    });
+
+    it('normalizes wrapped notification list payloads and computes unread count', () => {
+      const rawListPayload = {
+        items: [
+          { id: 'n1', title: 'N1', is_read: false },
+          { id: 'n2', title: 'N2', is_read: true },
+          { id: 'n3', title: 'N3', is_read: false },
+        ],
+        next_cursor: 'cursor_page_2',
+      };
+
+      const adapted = ApiAdapter.toNotificationList(rawListPayload);
+
+      expect(adapted.items).toHaveLength(3);
+      expect(adapted.unread_count).toBe(2);
+      expect(adapted.next_cursor).toBe('cursor_page_2');
+    });
+
+    it('normalizes alert preferences and applies fallback defaults', () => {
+      const partialPrefs = {
+        match_threshold: 88,
+        quiet_hours: {
+          enabled: true,
+          start: '23:00',
+          end: '07:00',
+        },
+      };
+
+      const adapted = ApiAdapter.toAlertPreferences(partialPrefs);
+
+      expect(adapted.match_threshold).toBe(88);
+      expect(adapted.types.high_match).toBe(true);
+      expect(adapted.types.low_competition).toBe(true);
+      expect(adapted.channels.in_app).toBe(true);
+      expect(adapted.quiet_hours.start).toBe('23:00');
+    });
+
+    it('normalizes unread count from various shape keys', () => {
+      expect(ApiAdapter.toUnreadCount(5)).toBe(5);
+      expect(ApiAdapter.toUnreadCount({ unread_count: 7 })).toBe(7);
+      expect(ApiAdapter.toUnreadCount({ unreadCount: 3 })).toBe(3);
+      expect(ApiAdapter.toUnreadCount({ count: 4 })).toBe(4);
+      expect(ApiAdapter.toUnreadCount({ data: { unread_count: 9 } })).toBe(9);
+    });
+  });
+
+  describe('Application & Status History Normalization', () => {
+    it('normalizes application DTO with stages and history timeline', () => {
+      const rawApp = {
+        application_id: 'app_101',
+        job_id: 'job_202',
+        title: 'Senior Frontend Engineer',
+        company_name: 'Stripe',
+        stage: 'interviewing',
+        created_at: '2026-10-01T10:00:00Z',
+        score: 0.94,
+        history: [
+          { entry_id: 'h1', status: 'applied', timestamp: '2026-10-01T10:00:00Z', actor: 'candidate' },
+          { entry_id: 'h2', status: 'interviewing', timestamp: '2026-10-03T14:00:00Z', actor: 'recruiter', comment: 'Screening scheduled' },
+        ],
+      };
+
+      const item = ApiAdapter.toApplicationItem(rawApp);
+
+      expect(item.id).toBe('app_101');
+      expect(item.job_id).toBe('job_202');
+      expect(item.company).toBe('Stripe');
+      expect(item.status).toBe('interviewing');
+      expect(item.match_score).toBe(94);
+      expect(item.status_history).toHaveLength(2);
+      expect(item.status_history[1].note).toBe('Screening scheduled');
+    });
+
+    it('normalizes wrapped application lists', () => {
+      const wrapped = {
+        items: [
+          { id: 'a1', job_id: 'j1', title: 'Developer', company: 'Linear', status: 'applied' },
+          { id: 'a2', job_id: 'j2', title: 'Designer', company: 'Figma', status: 'offer_extended' },
+        ]
+      };
+
+      const list = ApiAdapter.toApplicationList(wrapped);
+      expect(list).toHaveLength(2);
+      expect(list[0].id).toBe('a1');
+      expect(list[1].status).toBe('offer_extended');
+    });
+  });
+
+  describe('Competition Metrics Normalization', () => {
+    it('normalizes competition response and determines competition level thresholds', () => {
+      const lowComp = ApiAdapter.toCompetitionData({ count: 6, score: 92 }, 'job_01');
+      expect(lowComp.applicant_count).toBe(6);
+      expect(lowComp.competition_level).toBe('low');
+      expect(lowComp.match_percentage).toBe(92);
+
+      const highComp = ApiAdapter.toCompetitionData({ applicant_count: 55 }, 'job_02');
+      expect(highComp.applicant_count).toBe(55);
+      expect(highComp.competition_level).toBe('high');
+    });
+  });
+
+  describe('Analytics Normalization', () => {
+    it('normalizes candidate analytics summary and funnel counts', () => {
+      const rawCandidate = {
+        total_swipes: 24,
+        applications_sent: 10,
+        profile_view_rate: 42,
+        avg_match_score: 91,
+        funnel_counts: {
+          applied: 10,
+          shortlisted: 4,
+          interviewing: 2,
+          offered: 1,
+          rejected: 1,
+        },
+        top_skills_gap: [
+          { skill: 'GraphQL', count: 6, percentage: 60, learn_url: 'https://graphql.org' }
+        ],
+        score_trend: [
+          { date: 'Oct 01', score: 92, job_title: 'Frontend Engineer', company: 'Stripe' }
+        ],
+      };
+
+      const adapted = ApiAdapter.toCandidateAnalytics(rawCandidate);
+
+      expect(adapted.total_swipes).toBe(24);
+      expect(adapted.applications_sent).toBe(10);
+      expect(adapted.funnel_counts.applied).toBe(10);
+      expect(adapted.funnel_counts.shortlisted).toBe(4);
+      expect(adapted.top_skills_gap[0].skill).toBe('GraphQL');
+      expect(adapted.score_trend[0].score).toBe(92);
+    });
+
+    it('normalizes recruiter analytics summary and pipeline distribution', () => {
+      const rawRecruiter = {
+        total_jobs_posted: 6,
+        active_jobs: 4,
+        total_applicants: 28,
+        pipeline_distribution: {
+          New: 10,
+          Shortlisted: 8,
+          Interviewing: 5,
+          Offered: 3,
+          Rejected: 2,
+        },
+        avg_time_to_fill_days: 14,
+      };
+
+      const adapted = ApiAdapter.toRecruiterAnalytics(rawRecruiter);
+
+      expect(adapted.total_jobs).toBe(6);
+      expect(adapted.active_jobs).toBe(4);
+      expect(adapted.total_applicants).toBe(28);
+      expect(adapted.stage_counts.New).toBe(10);
+      expect(adapted.stage_counts.Shortlisted).toBe(8);
+      expect(adapted.avg_time_to_hire_days).toBe(14);
+    });
+
+    it('normalizes hiring trends data and kpis', () => {
+      const rawTrends = {
+        jobs_posted: [{ date: 'Day 1', count: 12 }],
+        top_skills: [{ skill: 'TypeScript', count: 88, percentage: 88 }],
+        startup_vs_mnc: [{ date: 'Day 1', startup: 8, mnc: 4 }],
+        kpis: {
+          total_jobs: 120,
+          pct_change: 15.5,
+          top_skill: 'TypeScript',
+          startup_share_pct: 66,
+        }
+      };
+
+      const adapted = ApiAdapter.toHiringTrends(rawTrends);
+
+      expect(adapted.jobs_posted).toHaveLength(1);
+      expect(adapted.top_skills[0].skill).toBe('TypeScript');
+      expect(adapted.kpis?.top_skill).toBe('TypeScript');
+      expect(adapted.kpis?.startup_share_pct).toBe(66);
+    });
+  });
 });
+

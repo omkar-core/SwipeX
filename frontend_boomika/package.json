@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:backend": "cd backend && python run_dev.py",
+    "dev:all": "start cmd /k \"npm run dev:backend\" && npm run dev",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",

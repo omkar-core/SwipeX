@@ -10,11 +10,20 @@
 
 export const API_CONFIG = {
   // Base URL for real backend REST endpoints
-  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8001/api/v1',
+  BASE_URL: import.meta.env.VITE_BASE_API_URL || 'http://localhost:8000/api/v1',
   
+  // Base URL for WebSocket notifications (auto-upgrades to wss in HTTPS environments)
+  WS_URL: import.meta.env.VITE_WS_URL || 
+    (typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? 'wss://localhost:8000/ws/notifications'
+      : 'ws://localhost:8000/ws/notifications'),
+
   // Flag to toggle between real fetch calls and isolated mock fallback
-  // Default is true when VITE_USE_MOCK is 'true' or not specified in dev
-  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'false' ? false : true,
+  // Default is true in test runner (Vitest) to maintain isolated offline unit tests.
+  // In dev/prod browser runtime, strictly obeys VITE_USE_MOCK (.env).
+  USE_MOCK: import.meta.env.MODE === 'test'
+    ? true
+    : (import.meta.env.VITE_USE_MOCK === 'false' ? false : true),
 
   // Request timeout in milliseconds
   TIMEOUT_MS: 10000,
@@ -31,8 +40,23 @@ export const API_CONFIG = {
     SAVED_JOBS: 'swipex_saved_jobs',
     RECRUITER_JOBS: 'swipex_recruiter_jobs',
     RECRUITER_APPLICANTS: 'swipex_recruiter_applicants',
+    NOTIFICATIONS: 'swipex_notifications',
+    ALERT_PREFERENCES: 'swipex_alert_preferences',
+    APPLICATIONS: 'swipex_applications',
   }
 };
+
+// Production misconfiguration diagnostic check
+if (
+  import.meta.env.PROD &&
+  !API_CONFIG.USE_MOCK &&
+  (API_CONFIG.BASE_URL.includes('localhost') || API_CONFIG.BASE_URL.includes('127.0.0.1'))
+) {
+  console.error(
+    '[SwipeX Config Warning] Running in PRODUCTION with USE_MOCK=false, but VITE_BASE_API_URL points to localhost (%s). Please configure a production backend API domain in your hosting environment variables.',
+    API_CONFIG.BASE_URL
+  );
+}
 
 export const API_ENDPOINTS = {
   AUTH: {
@@ -43,13 +67,9 @@ export const API_ENDPOINTS = {
   },
   JOBS: {
     LIST: '/jobs',
-    SEARCH: '/jobs/search',
-    DETAIL: (jobId: string) => `/jobs/${jobId}`,
+    DETAIL: (jobId: string | number) => `/jobs/${jobId}`,
     RECOMMENDATIONS: '/jobs/recommendations',
-  },
-  COMPANIES: {
-    LIST: '/companies',
-    DETAIL: (companyId: string) => `/companies/${companyId}`,
+    COMPETITION: (jobId: string | number) => `/jobs/${jobId}/competition`,
   },
   SWIPES: {
     SUBMIT: '/swipes',
@@ -71,6 +91,20 @@ export const API_ENDPOINTS = {
     UPDATE: '/profile/me',
     UPLOAD_PICTURE: '/profile/upload-picture',
   },
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    UNREAD_COUNT: '/notifications/unread-count',
+    MARK_READ: (id: string) => `/notifications/${id}/read`,
+    READ_ALL: '/notifications/read-all',
+    PREFERENCES: '/notifications/preferences',
+  },
+  APPLICATIONS: {
+    LIST: '/applications',
+    APPLY: '/applications',
+    DETAIL: (id: string) => `/applications/${id}`,
+    STATUS: (id: string) => `/applications/${id}/status`,
+    HISTORY: (id: string) => `/applications/${id}/history`,
+  },
   RECRUITER: {
     JOBS: '/recruiter/jobs',
     JOB_STATUS: (jobId: string | number) => `/recruiter/jobs/${jobId}`,
@@ -80,14 +114,9 @@ export const API_ENDPOINTS = {
   },
   ANALYTICS: {
     CANDIDATE_SUMMARY: '/analytics/candidate-summary',
-  },
-  ADMIN: {
-    DASHBOARD: '/admin/dashboard',
-    USERS: '/admin/users',
-    RECRUITERS: '/admin/recruiters',
-    JOBS: '/admin/jobs',
-    APPLICATIONS: '/admin/applications',
-    ANALYTICS: '/admin/analytics',
+    RECRUITER_SUMMARY: '/analytics/recruiter-summary',
+    ADMIN_SUMMARY: '/analytics/admin-summary',
+    HIRING_TRENDS: '/analytics/hiring-trends',
   }
 };
 

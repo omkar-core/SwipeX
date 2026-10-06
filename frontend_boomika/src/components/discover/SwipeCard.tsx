@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
-import { MapPin, DollarSign, X, Heart, Box, ArrowLeftRight, Flame } from 'lucide-react';
+import { MapPin, DollarSign, X, Heart, Box, Flame, ArrowLeftRight } from 'lucide-react';
 import { Job } from '../../types';
 import { getJobImage } from '../../utils/getJobImage';
 import { AiMatchBadge } from './AiMatchBadge';
+import { CompetitionBadge } from './CompetitionBadge';
+import { PostedTimeLabel } from './PostedTimeLabel';
+import { EarlyApplicantBadge } from './EarlyApplicantBadge';
 
 interface SwipeCardProps {
   job: Job;
@@ -85,6 +88,14 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ job, match_percentage, onS
           className="w-full h-full object-cover pointer-events-none"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 dark:from-black/70 via-transparent to-transparent pointer-events-none" />
+
+        {/* Floating Top Indicators on SwipeCard */}
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10 gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <PostedTimeLabel posted_at={job.posted_at} />
+            <EarlyApplicantBadge job={job} size="sm" />
+          </div>
+        </div>
       </div>
 
       {/* Content Area */}
@@ -118,8 +129,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ job, match_percentage, onS
           </div>
         </div>
 
-        {/* Meta Chips (Location & Salary) */}
-        <div className="flex flex-wrap items-center gap-2.5 mt-3.5">
+        {/* Meta Chips (Location, Salary & Competition Badge) */}
+        <div className="flex flex-wrap items-center gap-2 mt-3.5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F1F5F9] dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-300">
             <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span>{job.location}</span>
@@ -129,6 +140,8 @@ export const SwipeCard: React.FC<SwipeCardProps> = ({ job, match_percentage, onS
             <DollarSign className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span>{job.salary_range}</span>
           </div>
+
+          <CompetitionBadge job={job} size="sm" />
         </div>
 
         {/* Job Description */}

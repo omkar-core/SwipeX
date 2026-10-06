@@ -13,13 +13,15 @@ import { Check } from 'lucide-react';
 export const DiscoverScreen: React.FC = () => {
   const { user } = useAuth();
   
-  // Milestone 2 Data Abstraction Hook
+  // Milestone 2 & 4 Data Abstraction Hook
   const {
     jobs,
     currentIndex,
     currentJob,
     nextJob,
     canUndo,
+    applyFilters,
+    resetFilters,
     recordSwipe,
     undoLastSwipe,
     resetDeck
@@ -55,10 +57,6 @@ export const DiscoverScreen: React.FC = () => {
   const openJobDetail = useCallback((job: Job) => {
     setDetailJob(job);
     setIsDetailOpen(true);
-  }, []);
-
-  const handleApplyFilters = useCallback((filters: FiltersState) => {
-    console.debug('[DiscoverScreen] Applied filters (Local state):', filters);
   }, []);
 
   return (
@@ -97,8 +95,8 @@ export const DiscoverScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Panel Scaffold (Day 2 Component) */}
-          <FiltersPanel onApplyFilters={handleApplyFilters} />
+          {/* Discovery Filters Panel */}
+          <FiltersPanel onApplyFilters={applyFilters} onResetFilters={resetFilters} />
         </div>
 
         {/* Center Column: Framer Motion Swipe Deck */}

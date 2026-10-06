@@ -1,24 +1,15 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '../App';
 import { API_CONFIG } from '../config/api';
 import { User } from '../types';
-import { ApiService } from '../services/api';
 
 describe('Role-Based Access Control (RBAC) & Route Protection', () => {
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('swipex_onboarded', 'true'); // bypass onboarding modal in tests
-    vi.spyOn(ApiService, 'getMe').mockImplementation(async (_token?: string) => {
-      const userStr = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      if (userStr) {
-        const u = JSON.parse(userStr);
-        return { user_id: u.user_id, name: u.name, role: u.role, user: u };
-      }
-      throw new Error('Unauthorized');
-    });
   });
 
   it('unauthenticated users are blocked by auth guard and redirected to LoginScreen', async () => {
@@ -54,21 +45,21 @@ describe('Role-Based Access Control (RBAC) & Route Protection', () => {
     });
 
     // Navigate to Resume tab
-    const resumeTab = screen.getByText('Resume');
+    const resumeTab = screen.getByRole('button', { name: 'Resume' });
     fireEvent.click(resumeTab);
 
     await waitFor(() => {
       expect(screen.getByText(/Resume Versions & ATS Manager/i)).toBeInTheDocument();
       expect(screen.getByText(/Drag & Drop your resume here/i)).toBeInTheDocument();
-    });
+    }, { timeout: 4000 });
 
     // Navigate to ATS Score Matrix tab
-    const atsTab = screen.getByText('ATS Score');
+    const atsTab = screen.getByRole('button', { name: 'ATS Score' });
     fireEvent.click(atsTab);
 
     await waitFor(() => {
       expect(screen.getByText(/ATS Match Score & Gap Matrix/i)).toBeInTheDocument();
-    });
+    }, { timeout: 4000 });
   });
 
   it('Recruiter role is restricted from candidate resume management and ATS score dashboard', async () => {

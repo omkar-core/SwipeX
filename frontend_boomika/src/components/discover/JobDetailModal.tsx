@@ -2,6 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { X, MapPin, DollarSign, Building2, Briefcase, Check, Heart, Box, Tag } from 'lucide-react';
 import { Job } from '../../types';
 import { MatchRing } from './MatchRing';
+import { CompetitionBadge } from './CompetitionBadge';
+import { PostedTimeLabel } from './PostedTimeLabel';
+import { EarlyApplicantBadge } from './EarlyApplicantBadge';
 
 interface JobDetailModalProps {
   job: Job | null;
@@ -107,7 +110,10 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({
             </div>
 
             {/* Meta chips */}
-            <div className="flex flex-wrap gap-2 mb-5">
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <PostedTimeLabel posted_at={job.posted_at} />
+              <EarlyApplicantBadge job={job} size="sm" />
+              <CompetitionBadge job={job} size="sm" />
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300">
                 <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                 {job.location}

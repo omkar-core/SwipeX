@@ -19,8 +19,10 @@ import { useJobs } from '../../context/JobContext';
 import { useResume } from '../../context/ResumeContext';
 import { useToast } from '../../context/ToastContext';
 import { KanbanBoard } from './KanbanBoard';
+import { ApplicationTrackingBoard } from './ApplicationTrackingBoard';
 import { ProfileStrengthMeter } from './ProfileStrengthMeter';
-
+import { applicationService } from '../../services/applicationService';
+import { ApplicationItem } from '../../types/milestone4';
 
 interface ApplicationsScreenProps {
   onNavigateToResume: () => void;
@@ -33,14 +35,30 @@ export const ApplicationsScreen: React.FC<ApplicationsScreenProps> = ({ onNaviga
   const [filterActiveOnly, setFilterActiveOnly] = useState(false);
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   // Feature 4: Kanban vs Timeline view toggle
-  const [viewMode, setViewMode] = useState<'timeline' | 'kanban'>('timeline');
-
-
+  const [viewMode, setViewMode] = useState<'timeline' | 'kanban'>('kanban');
+  const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [isLoadingApps, setIsLoadingApps] = useState<boolean>(false);
   const displayedTimeline = filterActiveOnly 
     ? timeline.filter(t => t.status === 'Active') 
     : timeline;
 
   const currentMatchScore = atsResult?.match_score || 85;
+
+  const fetchApps = React.useCallback(async () => {
+    try {
+      setIsLoadingApps(true);
+      const data = await applicationService.getApplications();
+      setApplications(data);
+    } catch (err) {
+      console.warn('Failed to fetch applications:', err);
+    } finally {
+      setIsLoadingApps(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchApps();
+  }, [fetchApps]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -184,10 +202,14 @@ export const ApplicationsScreen: React.FC<ApplicationsScreenProps> = ({ onNaviga
               </div>
             </div>
 
-            {/* Feature 4: Kanban Board */}
+            {/* Canonical 6-Stage Kanban Board */}
             {viewMode === 'kanban' ? (
               <div className="pt-4">
-                <KanbanBoard timeline={timeline} />
+                <ApplicationTrackingBoard
+                  applications={applications}
+                  onRefresh={fetchApps}
+                  isLoading={isLoadingApps}
+                />
               </div>
             ) : (
               /* Vertical Timeline Items */

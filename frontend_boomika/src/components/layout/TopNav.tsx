@@ -1,8 +1,9 @@
 import React from 'react';
-import { Bell, Zap, Moon, Sun } from 'lucide-react';
+import { Zap, Moon, Sun, Menu } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { API_CONFIG } from '../../config/api';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 
 export type TabType = 
@@ -16,15 +17,20 @@ export type TabType =
   | 'recruiter-dashboard'
   | 'recruiter-post-job'
   | 'recruiter-pipeline'
-  | 'recruiter-jobs';
+  | 'recruiter-jobs'
+  | 'notifications'
+  | 'alert-settings'
+  | 'hiring-trends'
+  | 'admin-analytics';
 
 
 interface TopNavProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  onOpenMobileNav?: () => void;
 }
 
-export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
+export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange, onOpenMobileNav }) => {
   const { user, currentRole } = useAuth();
   const { isDark, toggleTheme } = useTheme();
 
@@ -34,6 +40,7 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
     { id: 'ats-dashboard', label: 'ATS Score' },
     { id: 'resume', label: 'Resume' },
     { id: 'analytics', label: 'Analytics' },
+    { id: 'hiring-trends', label: 'Hiring Trends' },
     { id: 'messages', label: 'Messages' },
   ];
 
@@ -42,23 +49,50 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
     { id: 'recruiter-post-job', label: 'Post a Job' },
     { id: 'recruiter-pipeline', label: 'Candidates' },
     { id: 'analytics', label: 'Analytics' },
+    { id: 'hiring-trends', label: 'Hiring Trends' },
   ];
 
-  const tabs = currentRole === 'recruiter' ? recruiterTabs : candidateTabs;
+  const adminTabs: { id: TabType; label: string }[] = [
+    { id: 'admin-analytics', label: 'Admin Overview' },
+    { id: 'hiring-trends', label: 'Hiring Trends' },
+    { id: 'recruiter-pipeline', label: 'Candidates' },
+    { id: 'analytics', label: 'Analytics' },
+  ];
+
+  const tabs = currentRole === 'admin' 
+    ? adminTabs 
+    : currentRole === 'recruiter' 
+      ? recruiterTabs 
+      : candidateTabs;
+
 
   return (
     <header className="w-full bg-white dark:bg-[#111827] border-b border-slate-200/80 dark:border-slate-700/60 sticky top-0 z-30 px-4 sm:px-8 h-16 flex items-center justify-between">
 
-      {/* Brand Logo */}
-      <div 
-        onClick={() => onTabChange(currentRole === 'recruiter' ? 'recruiter-dashboard' : 'discover')}
-        className="flex items-center gap-1.5 cursor-pointer select-none"
-      >
-        <span className="text-2xl font-black tracking-tight text-[#2563EB]">SwipeX</span>
+      {/* Brand Logo & Mobile Menu Trigger */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {onOpenMobileNav && (
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            aria-label="Open navigation menu"
+            data-testid="mobile-menu-trigger"
+            className="lg:hidden w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
+        <div 
+          onClick={() => onTabChange(currentRole === 'recruiter' ? 'recruiter-dashboard' : 'discover')}
+          className="flex items-center gap-1.5 cursor-pointer select-none"
+        >
+          <span className="text-2xl font-black tracking-tight text-[#2563EB]">SwipeX</span>
+        </div>
       </div>
 
       {/* Center Nav Tabs */}
-      <nav className="hidden md:flex items-center gap-8 h-full">
+      <nav className="hidden lg:flex items-center gap-8 h-full">
         {tabs.map((tab) => {
           const isActive = 
             activeTab === tab.id || 
@@ -96,15 +130,8 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, onTabChange }) => {
           </span>
         )}
 
-        {/* Notification Bell */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="w-9 h-9 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-full transition-colors relative cursor-pointer"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-blue-600 rounded-full"></span>
-        </button>
+        {/* Real Notification Bell with live count and dropdown */}
+        <NotificationBell onNavigateTab={onTabChange} />
 
         {/* Lightning Bolt Action */}
         <button

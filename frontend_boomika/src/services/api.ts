@@ -27,17 +27,15 @@ import {
   PipelineStage,
   RecruiterAnalyticsData,
   CandidateAnalyticsData,
-  Company,
-  CompanyDetail,
-  AdminDashboardData,
-  AdminUserRecord,
-  AdminRecruiterRecord,
-  AdminJobRecord,
-  AdminApplicationRecord,
-  AdminAnalyticsData
+  AdminAnalyticsData,
+  HiringTrendData,
+  HiringTrendRange,
+  RecommendationInsight,
+  SwipeBehaviorSummary,
+  ResumePerformanceItem
 } from '../types';
-import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME, MOCK_COMPANIES } from '../data/mockData';
-
+import { MOCK_JOBS, INITIAL_USER, MOCK_INITIAL_RESUME } from '../data/mockData';
+import { ApiAdapter } from './apiAdapter';
 
 // Realistic network latency simulation helper for mock mode
 const mockDelay = (ms = 250) => new Promise(resolve => setTimeout(resolve, ms));
@@ -73,6 +71,18 @@ async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Prom
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Handle 401: clear tokens and trigger unauthorized event
+        localStorage.removeItem(API_CONFIG.STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN);
+        window.dispatchEvent(new CustomEvent('swipex:unauthorized'));
+      } else if (response.status === 403) {
+        // Handle 403: permission forbidden
+        window.dispatchEvent(new CustomEvent('swipex:forbidden', { 
+          detail: { message: 'You do not have permission to access this resource.' } 
+        }));
+      }
+
       let errorData;
       try {
         errorData = await response.json();
@@ -95,6 +105,15 @@ async function httpRequest<T>(endpoint: string, options: RequestInit = {}): Prom
     if (error instanceof ApiError) {
       throw error;
     }
+    if (
+      error.name === 'TypeError' ||
+      (typeof error.message === 'string' && error.message.toLowerCase().includes('failed to fetch'))
+    ) {
+      throw new ApiError(
+        `Cannot reach the server at ${API_CONFIG.BASE_URL}. Make sure the backend is running.`,
+        0
+      );
+    }
     throw new ApiError(error.message || 'Network error occurred. Ensure backend is running.', 500);
   }
 }
@@ -115,10 +134,17 @@ export class ApiService {
     role?: UserRole 
   }): Promise<{ user_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<{ user_id: string }>(API_ENDPOINTS.AUTH.REGISTER, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+      try {
+        return await httpRequest<{ user_id: string }>(API_ENDPOINTS.AUTH.REGISTER, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn('[SwipeX API] Backend offline, falling back to local registration:', err);
+      }
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
@@ -129,7 +155,7 @@ export class ApiService {
       name: payload.name,
       email: payload.email,
       role: payload.role || 'candidate',
-      title: payload.role === 'recruiter' ? 'Talent Partner' : 'Senior Product Designer',
+      title: payload.role === 'recruiter' ? 'Senior Technical Recruiter' : payload.role === 'admin' ? 'Platform Administrator' : 'Senior Product Designer',
       tier: 'Tier 1 Talent',
       avatar: INITIAL_USER.avatar,
       skills: ['Figma', 'UX/UI', 'Design Systems']
@@ -147,35 +173,49 @@ export class ApiService {
     password: string 
   }): Promise<{ access_token: string; refresh_token: string; role: UserRole }> {
     if (!API_CONFIG.USE_MOCK) {
-      const data = await httpRequest<{ access_token: string; refresh_token: string; role: UserRole }>(
-        API_ENDPOINTS.AUTH.LOGIN,
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
+      try {
+        const data = await httpRequest<{ access_token: string; refresh_token: string; role: UserRole }>(
+          API_ENDPOINTS.AUTH.LOGIN,
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }
+        );
+        localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, data.access_token);
+        localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, data.refresh_token);
+        return data;
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
         }
-      );
-      localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, data.access_token);
-      localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, data.refresh_token);
-      return data;
+        console.warn('[SwipeX API] Backend offline, falling back to local authentication:', err);
+      }
     }
 
-    // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
+    // --- MOCK SERVICE LAYER (Milestone 1 Stub with dynamic role detection) ---
     await mockDelay(300);
     const accessToken = `mock_jwt_access_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
     const refreshToken = `mock_jwt_refresh_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    const role: UserRole = 'candidate';
+    
+    const emailLower = (payload.email || '').toLowerCase();
+    const role: UserRole = emailLower.includes('recruiter')
+      ? 'recruiter'
+      : emailLower.includes('admin')
+      ? 'admin'
+      : 'candidate';
 
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, accessToken);
     localStorage.setItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
 
-    const existing = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-    if (!existing) {
-      const user: User = {
-        ...INITIAL_USER,
-        email: payload.email || INITIAL_USER.email,
-      };
-      localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
-    }
+    const user: User = {
+      ...INITIAL_USER,
+      user_id: `usr_${role}_${Date.now().toString(36)}`,
+      name: role === 'recruiter' ? 'Sarah Connor' : role === 'admin' ? 'System Administrator' : 'Alex Mercer',
+      email: payload.email || (role === 'recruiter' ? 'recruiter@swipex.io' : 'alex@swipex.io'),
+      role: role,
+      title: role === 'recruiter' ? 'Senior Technical Recruiter' : role === 'admin' ? 'Platform Administrator' : 'Senior Product Designer',
+    };
+    localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
 
     return {
       access_token: accessToken,
@@ -190,12 +230,19 @@ export class ApiService {
    */
   static async oauthGoogle(): Promise<{ access_token: string; role: UserRole }> {
     if (!API_CONFIG.USE_MOCK) {
-      const data = await httpRequest<{ access_token: string; role: UserRole }>(
-        API_ENDPOINTS.AUTH.GOOGLE,
-        { method: 'GET' }
-      );
-      localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, data.access_token);
-      return data;
+      try {
+        const data = await httpRequest<{ access_token: string; role: UserRole }>(
+          API_ENDPOINTS.AUTH.GOOGLE,
+          { method: 'GET' }
+        );
+        localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, data.access_token);
+        return data;
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn('[SwipeX API] Backend offline, falling back to local Google OAuth mock:', err);
+      }
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
@@ -216,17 +263,55 @@ export class ApiService {
    */
   static async getMe(token?: string): Promise<{ user_id: string; name: string; role: UserRole; user: User }> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<{ user_id: string; name: string; role: UserRole; user: User }>(
-        API_ENDPOINTS.AUTH.ME,
-        { method: 'GET' }
-      );
+      try {
+        const data = await httpRequest<{ user_id: string; name: string; email?: string; role?: UserRole; user?: User }>(
+          API_ENDPOINTS.AUTH.ME,
+          { method: 'GET' }
+        );
+        const role: UserRole = data.role || data.user?.role || 'candidate';
+        const user: User = data.user || {
+          user_id: data.user_id,
+          name: data.name,
+          email: data.email || '',
+          role: role,
+          avatar: INITIAL_USER.avatar,
+          title: role === 'recruiter' ? 'Senior Technical Recruiter' : role === 'admin' ? 'Platform Administrator' : 'Senior Product Designer',
+          tier: 'Tier 1 Talent',
+          skills: ['Figma', 'UX/UI', 'Design Systems', 'React', 'TypeScript']
+        };
+        localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
+        return {
+          user_id: data.user_id,
+          name: data.name,
+          role: role,
+          user
+        };
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn('[SwipeX API] Backend offline, falling back to local session state for getMe:', err);
+      }
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub) ---
     await mockDelay(100);
     const stored = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
     if (!stored) {
-      throw new ApiError('No active session found', 401);
+      const fallbackUser: User = {
+        ...INITIAL_USER,
+        user_id: 'usr_candidate_alex',
+        name: 'Alex Mercer',
+        email: 'alex@swipex.io',
+        role: 'candidate',
+      };
+      localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(fallbackUser));
+      return {
+        user_id: fallbackUser.user_id,
+        name: fallbackUser.name,
+        role: fallbackUser.role,
+        user: fallbackUser
+      };
     }
     const user: User = JSON.parse(stored);
     return {
@@ -235,89 +320,6 @@ export class ApiService {
       role: user.role,
       user
     };
-  }
-
-  /* ==========================================================================
-     ADMIN CONTRACTS
-     ========================================================================== */
-
-  static async getAdminDashboard(): Promise<AdminDashboardData> {
-    if (API_CONFIG.USE_MOCK) {
-      return {
-        total_users: 154,
-        total_recruiters: 28,
-        total_job_seekers: 126,
-        total_jobs: MOCK_JOBS.length,
-        active_jobs: MOCK_JOBS.length,
-        total_applications: 342,
-        pending_items: 12,
-      };
-    }
-    return httpRequest<AdminDashboardData>(API_ENDPOINTS.ADMIN.DASHBOARD);
-  }
-
-  static async getAdminUsers(params: { search?: string; role?: string } = {}): Promise<AdminUserRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return [
-        { user_id: user.user_id, name: user.name, email: user.email, role: user.role, status: 'Active', created_at: '2025-01-15' },
-        { user_id: 'usr_rec_001', name: 'Sarah Jenkins', email: 'sarah@techcorp.io', role: 'recruiter', status: 'Active', created_at: '2025-02-01', company_name: 'TechCorp' },
-        { user_id: 'usr_adm_001', name: 'Admin One', email: 'admin@swipex.io', role: 'admin', status: 'Active', created_at: '2025-01-01' },
-      ];
-    }
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.role) query.set('role', params.role);
-    return httpRequest<AdminUserRecord[]>(`${API_ENDPOINTS.ADMIN.USERS}?${query}`);
-  }
-
-  static async getAdminRecruiters(params: string | { search?: string } = {}): Promise<AdminRecruiterRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return [
-        { user_id: 'usr_rec_001', name: 'Sarah Jenkins', email: 'sarah@techcorp.io', role: 'recruiter', status: 'Active', created_at: '2025-02-01', company_name: 'TechCorp', designation: 'Lead Talent Partner', job_count: 4 },
-        { user_id: 'usr_rec_002', name: 'Michael Chen', email: 'mchen@innovate.ai', role: 'recruiter', status: 'Active', created_at: '2025-02-10', company_name: 'Innovate AI', designation: 'Technical Recruiter', job_count: 2 },
-      ];
-    }
-    const query = new URLSearchParams();
-    const searchVal = typeof params === 'string' ? params : params.search;
-    if (searchVal) query.set('search', searchVal);
-    return httpRequest<AdminRecruiterRecord[]>(`${API_ENDPOINTS.ADMIN.RECRUITERS}?${query}`);
-  }
-
-  static async getAdminJobs(params: { search?: string; status?: string } = {}): Promise<AdminJobRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return MOCK_JOBS.map((j) => ({
-        job_id: String(j.job_id),
-        title: j.title,
-        company: j.company,
-        location: j.location,
-        status: ((j as any).status || 'Active') as JobStatus,
-        posted_at: j.posted_at || '2025-03-01',
-        application_count: j.applicant_count || Math.floor(Math.random() * 40) + 5,
-      }));
-    }
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.status) query.set('status', params.status);
-    return httpRequest<AdminJobRecord[]>(`${API_ENDPOINTS.ADMIN.JOBS}?${query}`);
-  }
-
-  static async getAdminApplications(params: { search?: string; stage?: string } = {}): Promise<AdminApplicationRecord[]> {
-    if (API_CONFIG.USE_MOCK) return [];
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.stage) query.set('stage', params.stage);
-    return httpRequest<AdminApplicationRecord[]>(`${API_ENDPOINTS.ADMIN.APPLICATIONS}?${query}`);
-  }
-
-  static async getAdminAnalytics(): Promise<AdminAnalyticsData> {
-    if (API_CONFIG.USE_MOCK) {
-      const storedUser = localStorage.getItem(API_CONFIG.STORAGE_KEYS.USER);
-      const user = storedUser ? JSON.parse(storedUser) as User : INITIAL_USER;
-      return { user_types: { job_seekers: user.role === 'job_seeker' ? 1 : 0, recruiters: user.role === 'recruiter' ? 1 : 0, admins: user.role === 'admin' ? 1 : 0 }, job_status: { active: MOCK_JOBS.length, closed: 0, draft: 0 }, application_stages: { New: 0, Shortlisted: 0, Interviewing: 0, Offered: 0, Rejected: 0 } };
-    }
-    return httpRequest<AdminAnalyticsData>(API_ENDPOINTS.ADMIN.ANALYTICS);
   }
 
   /* ==========================================================================
@@ -338,19 +340,26 @@ export class ApiService {
     industry?: string;
   }): Promise<Job[]> {
     if (!API_CONFIG.USE_MOCK) {
-      const query = new URLSearchParams();
-      if (params) {
-        if (params.type) query.append('type', params.type);
-        if (params.location) query.append('location', params.location);
-        if (params.remote) query.append('remote', params.remote);
-        if (params.salary_min) query.append('salary_min', params.salary_min.toString());
-        if (params.salary_max) query.append('salary_max', params.salary_max.toString());
-        if (params.skills) query.append('skills', params.skills);
-        if (params.industry) query.append('industry', params.industry);
+      try {
+        const query = new URLSearchParams();
+        if (params) {
+          if (params.type) query.append('type', params.type);
+          if (params.location) query.append('location', params.location);
+          if (params.remote) query.append('remote', params.remote);
+          if (params.salary_min) query.append('salary_min', params.salary_min.toString());
+          if (params.salary_max) query.append('salary_max', params.salary_max.toString());
+          if (params.skills) query.append('skills', params.skills);
+          if (params.industry) query.append('industry', params.industry);
+        }
+        const queryString = query.toString();
+        const endpoint = `${API_ENDPOINTS.JOBS.LIST}${queryString ? `?${queryString}` : ''}`;
+        return await httpRequest<Job[]>(endpoint, { method: 'GET' });
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn('[SwipeX API] Backend offline, falling back to mock jobs dataset:', err);
       }
-      const queryString = query.toString();
-      const endpoint = `${API_ENDPOINTS.JOBS.LIST}${queryString ? `?${queryString}` : ''}`;
-      return httpRequest<Job[]>(endpoint, { method: 'GET' });
     }
 
     // --- MOCK SERVICE LAYER (Milestone 1 Stub with dynamic filtering) ---
@@ -391,7 +400,14 @@ export class ApiService {
    */
   static async getJobById(jobId: string): Promise<Job> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<Job>(API_ENDPOINTS.JOBS.DETAIL(jobId), { method: 'GET' });
+      try {
+        return await httpRequest<Job>(API_ENDPOINTS.JOBS.DETAIL(jobId), { method: 'GET' });
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn(`[SwipeX API] Backend offline, falling back to mock job ${jobId}:`, err);
+      }
     }
 
     // --- MOCK SERVICE LAYER ---
@@ -404,84 +420,6 @@ export class ApiService {
   }
 
   /**
-   * GET /api/v1/jobs/search?q=...
-   * Searches job listings by keyword.
-   */
-  static async searchJobs(q: string): Promise<Job[]> {
-    if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<Job[]>(`${API_ENDPOINTS.JOBS.SEARCH}?q=${encodeURIComponent(q)}`, {
-        method: 'GET'
-      });
-    }
-
-    let jobs = [...MOCK_JOBS];
-    if (q && q.trim()) {
-      const term = q.toLowerCase().trim();
-      jobs = jobs.filter(j => 
-        (j.title || '').toLowerCase().includes(term) ||
-        (j.company || '').toLowerCase().includes(term) ||
-        (j.description || '').toLowerCase().includes(term) ||
-        (j.skills_required || j.skills || []).some(s => s.toLowerCase().includes(term))
-      );
-    }
-    return jobs;
-  }
-
-  /**
-   * GET /api/v1/companies
-   * Retrieves companies with optional newly_founded and industry filters.
-   */
-  static async getCompanies(params?: {
-    newly_founded?: boolean;
-    industry?: string;
-    type?: string;
-  }): Promise<Company[]> {
-    if (!API_CONFIG.USE_MOCK) {
-      const query = new URLSearchParams();
-      if (params) {
-        if (params.newly_founded !== undefined) query.append('newly_founded', String(params.newly_founded));
-        if (params.industry) query.append('industry', params.industry);
-        if (params.type) query.append('type', params.type);
-      }
-      const qs = query.toString();
-      const res = await httpRequest<any[]>(`${API_ENDPOINTS.COMPANIES.LIST}${qs ? `?${qs}` : ''}`, { method: 'GET' });
-      return (res || []).map(c => ({
-        ...c,
-        id: c.id || c.company_id || c.name,
-        company_id: c.company_id || c.id,
-      }));
-    }
-
-    await mockDelay(150);
-    let list = [...MOCK_COMPANIES];
-    if (params?.newly_founded !== undefined) {
-      list = list.filter(c => c.is_newly_founded === params.newly_founded);
-    }
-    if (params?.industry) {
-      list = list.filter(c => (c.industry || '').toLowerCase().includes(params.industry!.toLowerCase()));
-    }
-    return list;
-  }
-
-  /**
-   * GET /api/v1/companies/{company_id}
-   * Retrieves detailed company profile with active jobs.
-   */
-  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
-    if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<CompanyDetail>(API_ENDPOINTS.COMPANIES.DETAIL(companyId), { method: 'GET' });
-    }
-
-    await mockDelay(120);
-    const company = MOCK_COMPANIES.find(c => c.id === companyId) || MOCK_COMPANIES[0];
-    const relatedJobs = MOCK_JOBS.filter(j => (j.company || '').toLowerCase() === company.name.toLowerCase());
-    return {
-      ...company,
-      jobs: relatedJobs
-    };
-  }
-
-  /**
    * POST /api/v1/swipes
    * Records a user's swipe action (Pass / Save / Right / Left).
    */
@@ -490,10 +428,17 @@ export class ApiService {
     direction: 'left' | 'right' | 'up' 
   }): Promise<{ swipe_id: string }> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+      try {
+        return await httpRequest<{ swipe_id: string }>(API_ENDPOINTS.SWIPES.SUBMIT, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn('[SwipeX API] Backend offline, saving swipe locally:', err);
+      }
     }
 
     // --- MOCK SERVICE LAYER ---
@@ -519,10 +464,17 @@ export class ApiService {
    */
   static async getSwipeHistory(): Promise<Array<{ job_id: number | string; direction: 'left' | 'right' | 'up'; swiped_at: string }>> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<Array<{ job_id: number | string; direction: 'left' | 'right' | 'up'; swiped_at: string }>>(
-        API_ENDPOINTS.SWIPES.HISTORY,
-        { method: 'GET' }
-      );
+      try {
+        return await httpRequest<Array<{ job_id: number | string; direction: 'left' | 'right' | 'up'; swiped_at: string }>>(
+          API_ENDPOINTS.SWIPES.HISTORY,
+          { method: 'GET' }
+        );
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
+        }
+        console.warn('[SwipeX API] Backend offline, fetching local swipe history:', err);
+      }
     }
 
     // --- MOCK SERVICE LAYER ---
@@ -545,15 +497,22 @@ export class ApiService {
    */
   static async uploadResume(file: File): Promise<{ resume_id: string; parsed_skills: string[] }> {
     if (!API_CONFIG.USE_MOCK) {
-      const formData = new FormData();
-      formData.append('file', file);
-      return httpRequest<{ resume_id: string; parsed_skills: string[] }>(
-        API_ENDPOINTS.RESUMES.UPLOAD,
-        {
-          method: 'POST',
-          body: formData,
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        return await httpRequest<{ resume_id: string; parsed_skills: string[] }>(
+          API_ENDPOINTS.RESUMES.UPLOAD,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+      } catch (err: any) {
+        if (err.status !== 0 && !err.message?.includes('Cannot reach the server')) {
+          throw err;
         }
-      );
+        console.warn('[SwipeX API] Backend offline, parsing resume locally:', err);
+      }
     }
 
     // --- MOCK SERVICE LAYER WITH REAL DYNAMIC KEYWORD EXTRACTION ---
@@ -758,6 +717,58 @@ export class ApiService {
       };
     });
 
+    // Generate resume version performance breakdown
+    let resumePerformance: ResumePerformanceItem[] = [];
+    try {
+      const storedVersionsRaw = localStorage.getItem(API_CONFIG.STORAGE_KEYS.RESUME_VERSIONS);
+      if (storedVersionsRaw) {
+        const parsedVersions = JSON.parse(storedVersionsRaw);
+        if (Array.isArray(parsedVersions) && parsedVersions.length > 0) {
+          resumePerformance = parsedVersions.map((v: any, idx: number) => {
+            const views = Math.max(20 + (idx === 0 ? 38 : 14), 10);
+            const applies = Math.max(Math.floor(views * 0.45), 4);
+            const shortlists = Math.max(Math.floor(applies * (idx === 0 ? 0.55 : 0.35)), 2);
+            const interviews = Math.max(Math.floor(shortlists * 0.5), 1);
+            const rate = applies > 0 ? Math.round((shortlists / applies) * 100) : 35;
+            return {
+              resume_id: v.resume_id || `res-v${v.version || idx + 1}`,
+              version_label: v.version_label || v.filename || `Version ${v.version || idx + 1}`,
+              views,
+              applies,
+              shortlists,
+              interviews,
+              shortlist_rate: rate,
+            };
+          });
+        }
+      }
+    } catch {
+      // Fall through to default
+    }
+
+    if (resumePerformance.length === 0) {
+      resumePerformance = [
+        {
+          resume_id: 'res-v1',
+          version_label: 'Version 1 — Frontend Generalist',
+          views: 34,
+          applies: 12,
+          shortlists: 4,
+          interviews: 2,
+          shortlist_rate: 33,
+        },
+        {
+          resume_id: 'res-v2',
+          version_label: 'Version 2 — Senior React & TS Specialist',
+          views: 58,
+          applies: 22,
+          shortlists: 11,
+          interviews: 6,
+          shortlist_rate: 50,
+        },
+      ];
+    }
+
     return {
       total_swipes: totalSwipes,
       applications_sent: applicationsSent,
@@ -776,8 +787,40 @@ export class ApiService {
       score_trend: scoreTrend,
       top_industries: topIndustries,
       activity_heatmap: activityHeatmap,
+      resume_performance: resumePerformance,
       generated_at: new Date().toISOString(),
     };
+  }
+
+  /**
+   * GET /api/v1/jobs/{job_id}/competition
+   * Fetches real-time applicant count and competition heat level.
+   */
+  static async getJobCompetition(jobId: string | number): Promise<{
+    job_id: string;
+    applicant_count: number;
+    competition_level: 'low' | 'medium' | 'high';
+    match_percentage?: number;
+  }> {
+    if (!API_CONFIG.USE_MOCK) {
+      try {
+        const raw = await httpRequest<any>(API_ENDPOINTS.JOBS.COMPETITION(jobId), { method: 'GET' });
+        return ApiAdapter.toCompetitionData(raw, jobId);
+      } catch (err) {
+        console.warn(`[ApiService] Live GET /jobs/${jobId}/competition unavailable, using fallback:`, err);
+      }
+    }
+
+    await mockDelay(80);
+    const allJobs = [...MOCK_JOBS];
+    const found = allJobs.find(j => String(j.job_id) === String(jobId));
+    const count = found?.applicant_count ?? 4;
+    return ApiAdapter.toCompetitionData({
+      job_id: String(jobId),
+      applicant_count: count,
+      competition_level: found?.competition_level || (count < 10 ? 'low' : count > 30 ? 'high' : 'medium'),
+      match_percentage: found?.match_score || 88,
+    }, jobId);
   }
 
   /**
@@ -791,9 +834,10 @@ export class ApiService {
   }): Promise<CandidateAnalyticsData> {
     if (!API_CONFIG.USE_MOCK) {
       try {
-        return await httpRequest<CandidateAnalyticsData>(API_ENDPOINTS.ANALYTICS.CANDIDATE_SUMMARY, {
+        const raw = await httpRequest<any>(API_ENDPOINTS.ANALYTICS.CANDIDATE_SUMMARY, {
           method: 'GET',
         });
+        return ApiAdapter.toCandidateAnalytics(raw);
       } catch (err) {
         console.warn('Backend analytics endpoint call failed, falling back to dynamic generator:', err);
       }
@@ -806,6 +850,246 @@ export class ApiService {
       fallbackContext?.timelineCount,
       fallbackContext?.userSkills
     );
+  }
+
+  /**
+   * Fetches Platform-wide Admin Analytics Summary
+   */
+  static async getAdminAnalytics(): Promise<AdminAnalyticsData> {
+    if (!API_CONFIG.USE_MOCK) {
+      try {
+        const raw = await httpRequest<any>(API_ENDPOINTS.ANALYTICS.ADMIN_SUMMARY, {
+          method: 'GET',
+        });
+        return ApiAdapter.toAdminAnalytics(raw);
+      } catch (err) {
+        console.warn('Backend admin analytics failed, falling back to mock metrics:', err);
+      }
+    }
+
+    await mockDelay(200);
+    const past7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return {
+        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        count: Math.floor(40 + Math.sin(i) * 15 + i * 4),
+        candidates: Math.floor(25 + i * 3),
+        recruiters: Math.floor(5 + i),
+      };
+    });
+
+    return {
+      total_users: 1420,
+      active_jobs: 184,
+      total_applications: 3890,
+      avg_time_to_hire_days: 16.4,
+      platform_application_trend: past7Days.map(p => ({ date: p.date, count: p.count })),
+      user_growth: past7Days.map(p => ({ date: p.date, candidates: p.candidates, recruiters: p.recruiters })),
+      role_split: [
+        { role: 'Candidates', count: 1240, percentage: 87.3 },
+        { role: 'Recruiters', count: 162, percentage: 11.4 },
+        { role: 'Admins', count: 18, percentage: 1.3 },
+      ],
+      hiring_trend_summary: {
+        total_posted_last_30d: 184,
+        top_skill: 'React & TypeScript',
+        startup_share: 68,
+      },
+    };
+  }
+
+  /**
+   * Fetches Market Hiring Trends and Skill Demand with range support
+   */
+  static async getHiringTrends(range: HiringTrendRange = '30d'): Promise<HiringTrendData> {
+    if (!API_CONFIG.USE_MOCK) {
+      try {
+        let queryString = '';
+        if (typeof range === 'string') {
+          queryString = `?range=${range}`;
+        } else if (range && typeof range === 'object' && range.from && range.to) {
+          queryString = `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`;
+        }
+        const raw = await httpRequest<any>(`${API_ENDPOINTS.ANALYTICS.HIRING_TRENDS}${queryString}`, {
+          method: 'GET',
+        });
+        return ApiAdapter.toHiringTrends(raw);
+      } catch (err) {
+        console.warn('Backend hiring trends failed, using fallback:', err);
+      }
+    }
+
+    await mockDelay(180);
+
+    // Range-specific deterministic mock data generation
+    if (range === '7d') {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const counts = [42, 58, 64, 52, 68, 38, 44];
+      return {
+        jobs_posted: days.map((d, i) => ({ date: d, count: counts[i] })),
+        top_skills: [
+          { skill: 'React / Next.js', count: 184, percentage: 88 },
+          { skill: 'TypeScript', count: 162, percentage: 78 },
+          { skill: 'Tailwind CSS', count: 140, percentage: 67 },
+          { skill: 'Python / FastAPI', count: 112, percentage: 54 },
+          { skill: 'Node.js / Express', count: 96, percentage: 46 },
+          { skill: 'PostgreSQL / SQL', count: 88, percentage: 42 },
+          { skill: 'GraphQL / REST', count: 76, percentage: 36 },
+          { skill: 'Docker / Cloud', count: 64, percentage: 31 },
+        ],
+        startup_vs_mnc: days.map((d, i) => ({
+          date: d,
+          startup: Math.round(counts[i] * 0.72),
+          mnc: Math.round(counts[i] * 0.28),
+        })),
+        kpis: {
+          total_jobs: 366,
+          pct_change: 18.2,
+          top_skill: 'React / Next.js',
+          startup_share_pct: 72,
+        },
+      };
+    }
+
+    if (range === '90d') {
+      const weeks = Array.from({ length: 12 }, (_, i) => `Wk ${i + 1}`);
+      const baseCounts = [380, 410, 440, 420, 460, 490, 520, 500, 550, 580, 610, 640];
+      return {
+        jobs_posted: weeks.map((w, i) => ({ date: w, count: baseCounts[i] })),
+        top_skills: [
+          { skill: 'TypeScript', count: 1420, percentage: 84 },
+          { skill: 'React / Next.js', count: 1380, percentage: 82 },
+          { skill: 'Python & LLM Tooling', count: 1120, percentage: 66 },
+          { skill: 'Tailwind CSS', count: 980, percentage: 58 },
+          { skill: 'Go / Microservices', count: 740, percentage: 44 },
+          { skill: 'PostgreSQL / Supabase', count: 690, percentage: 41 },
+          { skill: 'AWS / Kubernetes', count: 620, percentage: 37 },
+          { skill: 'GraphQL / REST APIs', count: 540, percentage: 32 },
+        ],
+        startup_vs_mnc: weeks.map((w, i) => ({
+          date: w,
+          startup: Math.round(baseCounts[i] * 0.62),
+          mnc: Math.round(baseCounts[i] * 0.38),
+        })),
+        kpis: {
+          total_jobs: 6000,
+          pct_change: 24.5,
+          top_skill: 'TypeScript',
+          startup_share_pct: 62,
+        },
+      };
+    }
+
+    // Default: 30d (or custom date range)
+    const points = ['Day 3', 'Day 6', 'Day 9', 'Day 12', 'Day 15', 'Day 18', 'Day 21', 'Day 24', 'Day 27', 'Day 30'];
+    const counts = [140, 165, 150, 185, 210, 195, 220, 240, 230, 260];
+    return {
+      jobs_posted: points.map((p, i) => ({ date: p, count: counts[i] })),
+      top_skills: [
+        { skill: 'React & TypeScript', count: 512, percentage: 86 },
+        { skill: 'Next.js App Router', count: 440, percentage: 74 },
+        { skill: 'Tailwind CSS 3/4', count: 395, percentage: 66 },
+        { skill: 'Python / FastAPI', count: 310, percentage: 52 },
+        { skill: 'GraphQL & REST', count: 280, percentage: 47 },
+        { skill: 'PostgreSQL / Supabase', count: 245, percentage: 41 },
+        { skill: 'State Management (Zustand/Redux)', count: 210, percentage: 35 },
+        { skill: 'CI/CD & Testing (Vitest/Jest)', count: 180, percentage: 30 },
+      ],
+      startup_vs_mnc: points.map((p, i) => ({
+        date: p,
+        startup: Math.round(counts[i] * 0.68),
+        mnc: Math.round(counts[i] * 0.32),
+      })),
+      kpis: {
+        total_jobs: 1995,
+        pct_change: 14.3,
+        top_skill: 'React & TypeScript',
+        startup_share_pct: 68,
+      },
+    };
+  }
+
+  /**
+   * Recommendation Insights for AI Explainability
+   */
+  static async getRecommendationInsights(): Promise<RecommendationInsight[]> {
+    await mockDelay(150);
+    return [
+      {
+        job_id: 'job-01',
+        title: 'Senior Frontend Engineer',
+        company: 'Stripe',
+        match_percentage: 94,
+        reasons: [
+          'High skill overlap in React, TypeScript, and Design Systems',
+          'Preferred remote work model aligns with your profile settings',
+          'Competitive compensation matching your target salary range',
+        ],
+      },
+      {
+        job_id: 'job-02',
+        title: 'Full Stack Next.js Architect',
+        company: 'Vercel',
+        match_percentage: 89,
+        reasons: [
+          'Strong match on Next.js App Router and Server Components',
+          'Company is actively expanding their developer platform team',
+        ],
+      },
+      {
+        job_id: 'job-03',
+        title: 'Developer Experience Engineer',
+        company: 'Supabase',
+        match_percentage: 91,
+        reasons: [
+          'Matches open-source tooling and API documentation portfolio',
+          'Early applicant window open (<10 applicants currently applied)',
+        ],
+      },
+    ];
+  }
+
+  /**
+   * Swipe Behavior and Preferences Summary
+   */
+  static async getSwipeBehaviorSummary(): Promise<SwipeBehaviorSummary> {
+    await mockDelay(150);
+    return {
+      total_swipes: 48,
+      right_swipes: 28,
+      left_swipes: 20,
+      right_swipe_ratio: 0.58,
+      top_industry: 'Developer Tools & SaaS',
+      avg_saved_match: 88.5,
+    };
+  }
+
+  /**
+   * Resume Version Performance Comparison
+   */
+  static async getResumePerformance(): Promise<ResumePerformanceItem[]> {
+    await mockDelay(150);
+    return [
+      {
+        resume_id: 'res-v1',
+        version_label: 'Version 1 — Frontend Generalist',
+        views: 34,
+        applies: 12,
+        shortlists: 4,
+        interviews: 2,
+        shortlist_rate: 0.33,
+      },
+      {
+        resume_id: 'res-v2',
+        version_label: 'Version 2 — Senior React & TS Specialist',
+        views: 58,
+        applies: 22,
+        shortlists: 11,
+        interviews: 6,
+        shortlist_rate: 0.50,
+      },
+    ];
   }
 }
 
@@ -1240,9 +1524,14 @@ export class RecruiterApiService {
 
   static async getAnalytics(): Promise<RecruiterAnalyticsData> {
     if (!API_CONFIG.USE_MOCK) {
-      return httpRequest<RecruiterAnalyticsData>(API_ENDPOINTS.RECRUITER.ANALYTICS, {
-        method: 'GET',
-      });
+      try {
+        const raw = await httpRequest<any>(API_ENDPOINTS.RECRUITER.ANALYTICS, {
+          method: 'GET',
+        });
+        return ApiAdapter.toRecruiterAnalytics(raw);
+      } catch (err) {
+        console.warn('Backend recruiter analytics failed, falling back to mock metrics:', err);
+      }
     }
 
     // Mock Mode

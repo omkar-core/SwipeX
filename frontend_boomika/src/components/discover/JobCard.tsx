@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { 
   MapPin, 
   DollarSign, 
@@ -6,9 +6,6 @@ import {
   Heart, 
   RotateCcw, 
   Flame, 
-  Sparkles, 
-  Zap, 
-  Clock, 
   Building2, 
   ExternalLink,
   Briefcase
@@ -16,6 +13,9 @@ import {
 import { Job } from '../../types';
 import { getJobImage } from '../../utils/getJobImage';
 import { AiMatchBadge } from './AiMatchBadge';
+import { CompetitionBadge } from './CompetitionBadge';
+import { PostedTimeLabel } from './PostedTimeLabel';
+import { EarlyApplicantBadge } from './EarlyApplicantBadge';
 
 export interface JobCardProps {
   job: Job;
@@ -32,20 +32,8 @@ export interface JobCardProps {
 
 /**
  * Reusable Job Card Component
- * Conforms to Milestone 2 Day 1 Wireframe & UX Specifications.
+ * Conforms to Milestone 4 Specifications with Dynamic Competition & Freshness Badges.
  */
-// Pure helper to compute freshness indicator
-function getFreshnessLabel(postedAt?: string): string | null {
-  if (!postedAt) return null;
-  const postedTime = new Date(postedAt).getTime();
-  if (isNaN(postedTime)) return null;
-  const diffHours = (Date.now() - postedTime) / (1000 * 60 * 60);
-  if (diffHours < 24) return '✨ New Today';
-  if (diffHours < 48) return '🕒 1d ago';
-  if (diffHours < 168) return `🕒 ${Math.floor(diffHours / 24)}d ago`;
-  return null;
-}
-
 export const JobCard: React.FC<JobCardProps> = ({
   job,
   match_percentage,
@@ -57,12 +45,6 @@ export const JobCard: React.FC<JobCardProps> = ({
   className = '',
   showControls = true
 }) => {
-  const freshness = useMemo(() => getFreshnessLabel(job.posted_at), [job.posted_at]);
-
-  // Compute competition label
-  const isLowCompetition = job.competition_level === 'low' || (job.applicant_count !== undefined && job.applicant_count < 10);
-  const isHighCompetition = job.competition_level === 'high' || (job.applicant_count !== undefined && job.applicant_count >= 30);
-
   const displaySkills = (job.skills_required && job.skills_required.length > 0)
     ? job.skills_required
     : (job.skills || job.tags || ['React', 'TypeScript', 'Tailwind CSS']);
@@ -81,7 +63,7 @@ export const JobCard: React.FC<JobCardProps> = ({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
-        {/* Top Badges (Hot Match / Freshness / Company Type / AI Match %) */}
+        {/* Top Badges (Company Type / Freshness / Early Applicant / AI Match %) */}
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10 gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {job.company_type && (
@@ -90,11 +72,10 @@ export const JobCard: React.FC<JobCardProps> = ({
                 {job.company_type}
               </span>
             )}
-            {freshness && (
-              <span className="bg-emerald-500/95 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow backdrop-blur-md flex items-center gap-1">
-                {freshness}
-              </span>
-            )}
+            {/* Freshness Badge */}
+            <PostedTimeLabel posted_at={job.posted_at} />
+            {/* Early Applicant ⚡ Indicator */}
+            <EarlyApplicantBadge job={job} />
             {/* AI Match Badge */}
             <AiMatchBadge match_percentage={effectiveMatchScore} />
           </div>
@@ -159,20 +140,8 @@ export const JobCard: React.FC<JobCardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-              isLowCompetition 
-                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400' 
-                : 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
-            }`}>
-              <Zap className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Competition</p>
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                {isLowCompetition ? '⚡ Low (<10 applicants)' : isHighCompetition ? '🔥 High Demand' : 'Medium Competition'}
-              </p>
-            </div>
+          <div className="flex items-center justify-between sm:justify-start gap-2">
+            <CompetitionBadge job={job} size="md" />
           </div>
         </div>
 

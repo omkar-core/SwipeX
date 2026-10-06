@@ -13,7 +13,10 @@ import {
   Columns3,
   Users,
   Target,
-  FileText
+  FileText,
+  TrendingUp,
+  Bell,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TabType } from './TopNav';
@@ -35,6 +38,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
     { id: 'ats-dashboard' as TabType, label: 'ATS Score Matrix', icon: Target },
     { id: 'resume' as TabType, label: 'Resume Versions', icon: FileText },
     { id: 'analytics' as TabType, label: 'Analytics', icon: BarChart2 },
+    { id: 'hiring-trends' as TabType, label: 'Hiring Trends', icon: TrendingUp },
+    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell },
+    { id: 'alert-settings' as TabType, label: 'Alert Settings', icon: Sliders },
     { id: 'messages' as TabType, label: 'Messages', icon: MessageSquare },
     { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
   ];
@@ -45,16 +51,31 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
     { id: 'recruiter-pipeline' as TabType, label: 'Candidates (Pipeline)', icon: Columns3 },
     { id: 'recruiter-jobs' as TabType, label: 'My Job Listings', icon: Briefcase },
     { id: 'analytics' as TabType, label: 'Analytics', icon: BarChart2 },
+    { id: 'hiring-trends' as TabType, label: 'Hiring Trends', icon: TrendingUp },
     { id: 'messages' as TabType, label: 'Messages', icon: MessageSquare },
     { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
   ];
 
-  const navItems = currentRole === 'recruiter' ? recruiterNavItems : candidateNavItems;
+  const adminNavItems = [
+    { id: 'admin-analytics' as TabType, label: 'Admin Overview', icon: ShieldCheck },
+    { id: 'hiring-trends' as TabType, label: 'Hiring Trends', icon: TrendingUp },
+    { id: 'recruiter-pipeline' as TabType, label: 'Pipeline Review', icon: Columns3 },
+    { id: 'analytics' as TabType, label: 'Candidate Analytics', icon: BarChart2 },
+    { id: 'profile' as TabType, label: 'Edit Profile', icon: UserCheck },
+  ];
+
+  const navItems = currentRole === 'admin' 
+    ? adminNavItems 
+    : currentRole === 'recruiter' 
+      ? recruiterNavItems 
+      : candidateNavItems;
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as UserRole;
     switchRole(newRole);
-    if (newRole === 'recruiter') {
+    if (newRole === 'admin') {
+      onTabChange('admin-analytics');
+    } else if (newRole === 'recruiter') {
       onTabChange('recruiter-dashboard');
     } else if (newRole === 'candidate') {
       onTabChange('discover');
@@ -150,11 +171,15 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTab, onTabChange
       <div className="pt-4 border-t border-[#E2EAF2] space-y-1">
         <button
           type="button"
-          onClick={() => showToast('Settings: Configured for backend endpoint ' + (import.meta.env.VITE_BASE_API_URL || 'http://localhost:8000/api/v1'), 'info')}
-          className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 rounded-lg transition-colors cursor-pointer"
+          onClick={() => onTabChange('alert-settings')}
+          className={`w-full flex items-center gap-3 px-3.5 py-2 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+            activeTab === 'alert-settings'
+              ? 'bg-[#2563EB] text-white font-semibold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+          }`}
         >
-          <Settings className="w-4 h-4 text-slate-500" />
-          <span>Settings</span>
+          <Settings className="w-4 h-4" />
+          <span>Alert Settings</span>
         </button>
         
         <button

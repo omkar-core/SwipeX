@@ -1,57 +1,4 @@
-export type UserRole = 'job_seeker' | 'candidate' | 'recruiter' | 'admin';
-
-export interface AdminDashboardData {
-  total_users: number;
-  total_recruiters: number;
-  total_job_seekers: number;
-  total_jobs: number;
-  active_jobs: number;
-  total_applications: number;
-  pending_items: number;
-}
-
-export interface AdminUserRecord {
-  user_id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  status: string;
-  created_at?: string;
-  company_name?: string;
-}
-
-export interface AdminRecruiterRecord extends AdminUserRecord {
-  designation?: string;
-  job_count: number;
-}
-
-export interface AdminJobRecord {
-  job_id: string;
-  title: string;
-  company: string;
-  location: string;
-  status: JobStatus;
-  recruiter_id?: string;
-  posted_at?: string;
-  application_count: number;
-}
-
-export interface AdminApplicationRecord {
-  application_id: string;
-  candidate_name: string;
-  candidate_email: string;
-  job_title: string;
-  company: string;
-  recruiter_id?: string;
-  stage: string;
-  applied_at?: string;
-}
-
-export interface AdminAnalyticsData {
-  user_types: Record<string, number>;
-  job_status: Record<string, number>;
-  application_stages: Record<string, number>;
-}
+export type UserRole = 'candidate' | 'recruiter' | 'admin';
 
 export interface User {
   user_id: string;
@@ -364,6 +311,8 @@ export interface RecruiterAnalyticsData {
   total_applicants: number;
   stage_counts: Record<PipelineStage, number>;
   avg_time_to_hire_days: number;
+  applicants_per_job?: { job_id: string | number; title: string; applicant_count: number }[];
+  applications_over_time?: { date: string; count: number }[];
 }
 
 export interface CandidateFunnelCounts {
@@ -414,25 +363,12 @@ export interface CandidateAnalyticsData {
   top_industries: CandidateIndustryEngagementItem[];
   activity_heatmap: CandidateActivityDayItem[];
   generated_at?: string;
+  resume_performance?: import('./milestone4').ResumePerformanceItem[];
+  recommendation_insights?: import('./milestone4').RecommendationInsight[];
+  swipe_behavior?: import('./milestone4').SwipeBehaviorSummary;
 }
 
-export interface Company {
-  id: string;
-  company_id?: string;
-  name: string;
-  company_type?: string;
-  aggregate_rating?: number;
-  reviews_count?: number;
-  about?: string;
-  size?: string;
-  industry?: string;
-  is_newly_founded: boolean;
-  jobs_count?: number;
-}
-
-export interface CompanyDetail extends Company {
-  jobs: Job[];
-}
+export * from './milestone4';
 
 
 

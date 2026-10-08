@@ -34,7 +34,7 @@ recommendations = get_recommendations(
     resume_skills,
     resume_text,
     user_id,
-    limit=5
+    limit=10
 )
 
 

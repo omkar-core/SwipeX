@@ -139,10 +139,11 @@ def test_competition_low():
 def test_competition_medium():
     assert compute_competition_level(10) == "MEDIUM"
     assert compute_competition_level(25) == "MEDIUM"
-    assert compute_competition_level(50) == "MEDIUM"
+    assert compute_competition_level(49) == "MEDIUM"
 
 
 def test_competition_high():
+    assert compute_competition_level(50) == "HIGH"
     assert compute_competition_level(51) == "HIGH"
     assert compute_competition_level(100) == "HIGH"
     assert compute_competition_level(1000) == "HIGH"

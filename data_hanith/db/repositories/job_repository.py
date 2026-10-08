@@ -196,7 +196,7 @@ class JobRepository:
 
             sal_range_str = format_salary_range(min_sal, max_sal, curr)
             app_count = int(r_dict["applicant_count"]) if r_dict.get("applicant_count") is not None else 0
-            comp_lvl = compute_competition_level(app_count)
+            comp_lvl = compute_competition_level(app_count, r_dict.get("posted_at_approx"))
             fresh_lvl = compute_freshness_level(
                 posted_at_approx=r_dict.get("posted_at_approx"),
                 posted_at_raw=r_dict.get("posted_at"),
@@ -309,7 +309,7 @@ class JobRepository:
         curr = str(r["currency"]) if r["currency"] else "INR"
         sal_range_str = format_salary_range(min_sal, max_sal, curr)
         app_count = int(r["applicant_count"]) if r.get("applicant_count") is not None else 0
-        comp_lvl = compute_competition_level(app_count)
+        comp_lvl = compute_competition_level(app_count, r.get("posted_at_approx"))
         fresh_lvl = compute_freshness_level(
             posted_at_approx=r.get("posted_at_approx"),
             posted_at_raw=r.get("posted_at_raw"),

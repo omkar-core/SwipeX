@@ -16,6 +16,7 @@ SERVICE_DIR = os.path.join(BASE_DIR, "data_hanith")
 if SERVICE_DIR not in sys.path:
     sys.path.insert(0, SERVICE_DIR)
 
+from datetime import datetime, timezone
 from config import RAW_DATASET1_PATH, DATABASE_URL
 from scripts.ingest_dataset1 import run_ingestion
 from main import app
@@ -165,10 +166,11 @@ def test_job_deletion_cascade_fk():
     desc = "Cascade testing description"
     posted_at = "Just Now"
 
+    now_iso = datetime.now(timezone.utc).isoformat()
     cur.execute(f"""
-        INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, currency, location, posted_at_raw)
-        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, 'INR', 'Test City', {placeholder});
-    """, (test_job_id, raw_job_id, c_id, title, desc, posted_at))
+        INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, currency, location, posted_at_raw, created_at, updated_at)
+        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, 'INR', 'Test City', {placeholder}, {placeholder}, {placeholder});
+    """, (test_job_id, raw_job_id, c_id, title, desc, posted_at, now_iso, now_iso))
 
     # 3. Insert temporary job_skills link
     cur.execute(f"INSERT INTO job_skills (job_id, skill_id) VALUES ({placeholder}, {placeholder});", (test_job_id, sk_id))
@@ -177,9 +179,9 @@ def test_job_deletion_cascade_fk():
     test_user_id = str(uuid.uuid4())
     test_swipe_id = str(uuid.uuid4())
     cur.execute(f"""
-        INSERT INTO swipes (id, user_id, job_id, direction)
-        VALUES ({placeholder}, {placeholder}, {placeholder}, 'RIGHT');
-    """, (test_swipe_id, test_user_id, test_job_id))
+        INSERT INTO swipes (id, user_id, job_id, direction, swiped_at)
+        VALUES ({placeholder}, {placeholder}, {placeholder}, 'RIGHT', {placeholder});
+    """, (test_swipe_id, test_user_id, test_job_id, now_iso))
     conn.commit()
 
     # 5. Delete test job

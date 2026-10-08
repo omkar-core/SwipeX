@@ -15,6 +15,7 @@ SERVICE_DIR = os.path.join(BASE_DIR, "data_hanith")
 if SERVICE_DIR not in sys.path:
     sys.path.insert(0, SERVICE_DIR)
 
+from datetime import datetime, timezone
 from config import RAW_DATASET1_PATH, DATABASE_URL
 from scripts.ingest_dataset1 import run_ingestion
 from main import app
@@ -202,10 +203,11 @@ def test_relational_cascade_and_targeted_cleanup(api_client):
     # 2. Insert test job
     test_job_uuid = str(uuid.uuid4())
     raw_id = 88888888
+    now_iso = datetime.now(timezone.utc).isoformat()
     cur.execute(f"""
-        INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, currency, location, posted_at_raw)
-        VALUES ({placeholder}, {placeholder}, {placeholder}, 'D6 QA Job', 'Description', 'INR', 'Test Location', 'Today');
-    """, (test_job_uuid, raw_id, c_id))
+        INSERT INTO jobs (id, raw_job_id, company_id, title, job_description, currency, location, posted_at_raw, created_at, updated_at)
+        VALUES ({placeholder}, {placeholder}, {placeholder}, 'D6 QA Job', 'Description', 'INR', 'Test Location', 'Today', {placeholder}, {placeholder});
+    """, (test_job_uuid, raw_id, c_id, now_iso, now_iso))
 
     # 3. Insert test job_skill link
     cur.execute(f"INSERT INTO job_skills (job_id, skill_id) VALUES ({placeholder}, {placeholder});", (test_job_uuid, sk_id))

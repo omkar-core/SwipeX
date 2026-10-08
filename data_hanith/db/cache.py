@@ -208,6 +208,59 @@ class RedisCacheService:
             logger.warning(f"[Cache Failure] invalidate_user_feed_cache error for user {user_id}: {exc}")
             return False
 
+    # -------------------------------------------------------------------------
+    # JOB COMPETITION CACHE (competition:{job_id})
+    # -------------------------------------------------------------------------
+    def get_job_competition(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves cached competition metrics for a job:
+        {"applicant_count": int, "competition_level": str, "is_recently_posted": bool}
+        Returns None on cache miss or Redis failure.
+        """
+        cli = self.client
+        if cli is None:
+            return None
+        key = f"competition:{job_id}"
+        try:
+            val = cli.get(key)
+            if val:
+                return json.loads(val)
+            return None
+        except Exception as exc:
+            logger.warning(f"[Cache Failure] get_job_competition error for job {job_id}: {exc}")
+            return None
+
+    def set_job_competition(self, job_id: str, data: Dict[str, Any], ttl: int = 600) -> bool:
+        """
+        Caches job competition metrics with TTL (default 600s / 10 minutes).
+        """
+        cli = self.client
+        if cli is None:
+            return False
+        key = f"competition:{job_id}"
+        try:
+            cli.setex(key, ttl, json.dumps(data))
+            return True
+        except Exception as exc:
+            logger.warning(f"[Cache Failure] set_job_competition error for job {job_id}: {exc}")
+            return False
+
+    def invalidate_job_competition(self, job_id: str) -> bool:
+        """
+        Invalidates cached competition metrics for job_id upon application creation.
+        """
+        cli = self.client
+        if cli is None:
+            return False
+        key = f"competition:{job_id}"
+        try:
+            cli.delete(key)
+            return True
+        except Exception as exc:
+            logger.warning(f"[Cache Failure] invalidate_job_competition error for job {job_id}: {exc}")
+            return False
+
 
 def get_cache_service() -> RedisCacheService:
     return RedisCacheService()
+

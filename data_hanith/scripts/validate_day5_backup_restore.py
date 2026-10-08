@@ -57,7 +57,7 @@ def validate_sqlite_backup_restore(sqlite_path: str) -> dict:
     # 3. Read live counts
     live_conn = sqlite3.connect(sqlite_path)
     live_cur = live_conn.cursor()
-    tables = ["jobs", "companies", "skills", "job_skills", "job_keywords", "resumes", "resume_versions", "ats_scores", "swipes", "saved_jobs"]
+    tables = ["jobs", "companies", "skills", "job_skills", "job_keywords", "resumes", "resume_versions", "ats_scores", "swipes", "saved_jobs", "applications", "application_status_events", "resume_version_views", "notifications", "notification_deliveries", "alert_preferences", "daily_application_analytics", "daily_hiring_trend_analytics"]
     live_counts = {}
     for tbl in tables:
         live_cur.execute(f"SELECT COUNT(*) FROM {tbl};")
@@ -78,11 +78,8 @@ def validate_sqlite_backup_restore(sqlite_path: str) -> dict:
     test_conn.close()
 
     assert len(fk_errors) == 0, f"Foreign key check failed in restored DB: {fk_errors}"
-    assert test_counts["jobs"] == 97929, f"Expected 97,929 jobs, got {test_counts['jobs']}"
-    assert test_counts["companies"] == 18328, f"Expected 18,328 companies, got {test_counts['companies']}"
-    assert test_counts["skills"] == 44078, f"Expected 44,078 skills, got {test_counts['skills']}"
-    assert test_counts["job_skills"] == 755099, f"Expected 755,099 job_skills, got {test_counts['job_skills']}"
-    assert test_counts["job_keywords"] == 156908, f"Expected 156,908 job_keywords, got {test_counts['job_keywords']}"
+    for tbl in tables:
+        assert test_counts[tbl] == live_counts[tbl], f"Restored count mismatch for table '{tbl}': expected {live_counts[tbl]}, got {test_counts[tbl]}"
 
     print(f"[SQLITE VERIFICATION PASSED] Restored counts match live DB 100%:")
     for tbl, count in test_counts.items():
@@ -144,7 +141,7 @@ def validate_postgres_backup_restore() -> dict:
 
     print(f"[RESTORE SUCCESS] Restored archive into '{target_db}' in {elapsed_restore:.2f} seconds.")
 
-    tables = ["jobs", "companies", "skills", "job_skills", "job_keywords", "resumes", "resume_versions", "ats_scores", "swipes", "saved_jobs"]
+    tables = ["jobs", "companies", "skills", "job_skills", "job_keywords", "resumes", "resume_versions", "ats_scores", "swipes", "saved_jobs", "applications", "application_status_events", "resume_version_views", "notifications", "notification_deliveries", "alert_preferences", "daily_application_analytics", "daily_hiring_trend_analytics"]
     live_conn = psycopg2.connect(dbname=LIVE_DB_NAME, user=DB_USER, host=DB_HOST, port=DB_PORT)
     live_cur = live_conn.cursor()
     live_counts = {}

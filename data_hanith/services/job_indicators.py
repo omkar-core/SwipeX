@@ -1,26 +1,121 @@
-"""
-Job Indicators Service for Job & Data Intelligence Service.
-Provides reusable, deterministic, timezone-safe, and null-safe helpers for
-freshness category calculation and competition level classification.
-"""
 import re
-from datetime import datetime, timezone
-from typing import Optional, Union
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Union, Tuple, Dict, Any
+
+from config import get_reference_time, EARLY_APPLICANT_WINDOW_HOURS
 
 
-def compute_competition_level(applicant_count: Optional[int]) -> str:
+def parse_datetime_utc(dt_val: Optional[Union[datetime, str]]) -> Optional[datetime]:
+    """Helper to safely convert ISO string or datetime to timezone-aware UTC datetime."""
+    if not dt_val:
+        return None
+    if isinstance(dt_val, datetime):
+        return dt_val if dt_val.tzinfo else dt_val.replace(tzinfo=timezone.utc)
+    if isinstance(dt_val, str):
+        try:
+            iso_str = dt_val.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(iso_str)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def compute_competition_level(
+    applicant_count: Optional[int],
+    posted_at_approx: Optional[Union[datetime, str]] = None,
+    ref_date: Optional[datetime] = None
+) -> str:
     """
-    Computes competition level based on applicant_count:
-    - LOW: < 10 applicants
-    - MEDIUM: 10 - 50 applicants
-    - HIGH: > 50 applicants
+    Computes competition level deterministically based on applicant_count (A) and job age (Age in days):
+    - HIGH: A >= 50 OR (A >= 20 AND Age <= 7 days)
+    - LOW: A < 10 OR (A < 20 AND Age > 30 days)
+    - MEDIUM: Everything else (mutually exclusive)
+
+    If posted_at_approx is NULL/unparseable, falls back to count-only thresholds:
+    - HIGH: A >= 50
+    - MEDIUM: 10 <= A < 50
+    - LOW: A < 10
     """
-    if applicant_count is None or applicant_count < 10:
-        return "LOW"
-    elif applicant_count <= 50:
-        return "MEDIUM"
-    else:
+    A = applicant_count if (applicant_count is not None and applicant_count >= 0) else 0
+    posted_dt = parse_datetime_utc(posted_at_approx)
+
+    if posted_dt is None:
+        # Fallback for NULL posting date: count-based thresholding without fake timestamps
+        if A >= 50:
+            return "HIGH"
+        elif A >= 10:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    if ref_date is None:
+        ref_date = get_reference_time()
+    elif ref_date.tzinfo is None:
+        ref_date = ref_date.replace(tzinfo=timezone.utc)
+
+    delta = ref_date - posted_dt
+    age_days = delta.total_seconds() / 86400.0
+    if age_days < 0:
+        age_days = 0.0
+
+    # 1. HIGH condition
+    if A >= 50 or (A >= 20 and age_days <= 7.0):
         return "HIGH"
+
+    # 2. LOW condition
+    if A < 10 or (A < 20 and age_days > 30.0):
+        return "LOW"
+
+    # 3. MEDIUM condition (Everything else)
+    return "MEDIUM"
+
+
+def compute_early_applicant_status(
+    applied_at: Union[datetime, str],
+    posted_at_approx: Optional[Union[datetime, str]],
+    window_hours: int = EARLY_APPLICANT_WINDOW_HOURS
+) -> Tuple[Optional[bool], str]:
+    """
+    Evaluates early applicant status with strict NULL semantics:
+    - If posted_at_approx is NULL/unparseable: returns (None, "UNAVAILABLE")
+    - If applied_at <= posted_at_approx + window_hours: returns (True, "EARLY")
+    - Else: returns (False, "REGULAR")
+    """
+    posted_dt = parse_datetime_utc(posted_at_approx)
+    if posted_dt is None:
+        return None, "UNAVAILABLE"
+
+    applied_dt = parse_datetime_utc(applied_at)
+    if applied_dt is None:
+        return None, "UNAVAILABLE"
+
+    early_deadline = posted_dt + timedelta(hours=window_hours)
+    if applied_dt <= early_deadline:
+        return True, "EARLY"
+    return False, "REGULAR"
+
+
+def compute_is_recently_posted(
+    posted_at_approx: Optional[Union[datetime, str]],
+    ref_date: Optional[datetime] = None,
+    window_hours: int = 48
+) -> bool:
+    """
+    Public job freshness helper evaluating whether the job itself was posted recently (<= 48h).
+    """
+    posted_dt = parse_datetime_utc(posted_at_approx)
+    if posted_dt is None:
+        return False
+
+    if ref_date is None:
+        ref_date = get_reference_time()
+    elif ref_date.tzinfo is None:
+        ref_date = ref_date.replace(tzinfo=timezone.utc)
+
+    delta = ref_date - posted_dt
+    age_hours = delta.total_seconds() / 3600.0
+    return 0.0 <= age_hours <= float(window_hours)
 
 
 def compute_freshness_level(
@@ -35,48 +130,28 @@ def compute_freshness_level(
     - RECENT: 8 to 14 days old
     - AGING: 15 to 30 days old
     - STALE: > 30 days old
-
-    Priority order for date source:
-    1. posted_at_approx (parsed ISO string or datetime)
-    2. posted_at_raw relative string parsing
-    3. created_at timestamp fallback
     """
-    # Baseline reference date (defaults to UTC current time if not supplied)
     if ref_date is None:
-        ref_date = datetime.now(timezone.utc)
+        ref_date = get_reference_time()
     elif ref_date.tzinfo is None:
         ref_date = ref_date.replace(tzinfo=timezone.utc)
 
-    # 1. Primary path: posted_at_approx
-    if posted_at_approx:
-        dt = None
-        if isinstance(posted_at_approx, datetime):
-            dt = posted_at_approx
-        elif isinstance(posted_at_approx, str):
-            try:
-                iso_str = posted_at_approx.replace("Z", "+00:00")
-                dt = datetime.fromisoformat(iso_str)
-            except (ValueError, TypeError):
-                dt = None
+    dt = parse_datetime_utc(posted_at_approx)
+    if dt:
+        delta = ref_date - dt
+        age_days = delta.total_seconds() / 86400.0
+        if age_days < 0:
+            age_days = 0.0
 
-        if dt:
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            delta = ref_date - dt
-            age_days = delta.total_seconds() / 86400.0
-            if age_days < 0:
-                age_days = 0.0
+        if age_days <= 7.0:
+            return "FRESH"
+        elif age_days <= 14.0:
+            return "RECENT"
+        elif age_days <= 30.0:
+            return "AGING"
+        else:
+            return "STALE"
 
-            if age_days <= 7.0:
-                return "FRESH"
-            elif age_days <= 14.0:
-                return "RECENT"
-            elif age_days <= 30.0:
-                return "AGING"
-            else:
-                return "STALE"
-
-    # 2. Secondary path: parse posted_at_raw string
     if posted_at_raw and isinstance(posted_at_raw, str):
         raw = posted_at_raw.strip().lower()
         if any(token in raw for token in ("just now", "today", "few hours ago", "hour")):
@@ -97,37 +172,43 @@ def compute_freshness_level(
                 return "STALE"
 
         if raw.startswith("starts"):
-            # Future start date postings are considered upcoming / FRESH
             return "FRESH"
 
-    # 3. Tertiary path: fallback to created_at
-    if created_at:
-        dt_c = None
-        if isinstance(created_at, datetime):
-            dt_c = created_at
-        elif isinstance(created_at, str):
-            try:
-                iso_str = created_at.replace("Z", "+00:00")
-                dt_c = datetime.fromisoformat(iso_str)
-            except (ValueError, TypeError):
-                dt_c = None
+    dt_c = parse_datetime_utc(created_at)
+    if dt_c:
+        delta_c = ref_date - dt_c
+        age_c = delta_c.total_seconds() / 86400.0
+        if age_c < 0:
+            age_c = 0.0
 
-        if dt_c:
-            if dt_c.tzinfo is None:
-                dt_c = dt_c.replace(tzinfo=timezone.utc)
-            delta = ref_date - dt_c
-            age_days = delta.total_seconds() / 86400.0
-            if age_days < 0:
-                age_days = 0.0
+        if age_c <= 7.0:
+            return "FRESH"
+        elif age_c <= 14.0:
+            return "RECENT"
+        elif age_c <= 30.0:
+            return "AGING"
+        else:
+            return "STALE"
 
-            if age_days <= 7.0:
-                return "FRESH"
-            elif age_days <= 14.0:
-                return "RECENT"
-            elif age_days <= 30.0:
-                return "AGING"
-            else:
-                return "STALE"
-
-    # Default fallback if all fields missing or unparseable
     return "STALE"
+
+
+def classify_company_type(company_type: Optional[str]) -> str:
+    """
+    Classifies company_type strictly according to approved project rule:
+    - STARTUP: explicitly contains "STARTUP"
+    - MNC: explicitly contains "MNC" or "MULTINATIONAL"
+    - OTHER: everything else (Corporate, Conglomerate, Enterprise, Private, Public, NULL, etc.)
+    """
+    if not company_type or not isinstance(company_type, str):
+        return "OTHER"
+
+    ct = company_type.strip().upper()
+    if "STARTUP" in ct:
+        return "STARTUP"
+    if "MNC" in ct or "MULTINATIONAL" in ct:
+        return "MNC"
+    return "OTHER"
+
+
+

@@ -1,4 +1,3 @@
-import pytest
 from app.ats import calculate_ats_score
 
 
@@ -20,7 +19,7 @@ def test_partial_skills_match():
         ["python", "sql", "fastapi", "git"]
     )
 
-    assert result["score"] == pytest.approx(68.42, rel=0.01)
+    assert result["score"] == 68.42
 
     assert result["matched_skills"] == [
         "python",

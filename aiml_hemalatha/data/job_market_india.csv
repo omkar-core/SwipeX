@@ -1,6 +1,11 @@
-Job Title,Location,Salary,Monthly Salary
-Python Developer,Bangalore,600000,50000
-Java Developer,Hyderabad,540000,45000
-Data Analyst,Chennai,480000,40000
-Frontend Developer,Bangalore,500000,41666
-Embedded Engineer,Hyderabad,600000,50000
+job_id,job_title,location,required_skills,min_experience,max_experience,salary,monthly_salary
+JOB001,Python Developer,Bangalore,python|sql|git|api|fastapi|django|flask,0,2,600000,50000
+JOB002,Java Developer,Hyderabad,java|sql|git|spring|spring boot|rest api|maven,1,3,540000,45000
+JOB003,Data Analyst,Chennai,python|sql|excel|pandas|numpy|power bi|statistics,0,2,480000,40000
+JOB004,Frontend Developer,Bangalore,html|css|javascript|react|typescript|git|bootstrap,0,2,500000,41667
+JOB005,Embedded Engineer,Hyderabad,c|embedded systems|microcontroller|arduino|c++|uart|spi,0,2,600000,50000
+JOB006,Data Scientist,Bangalore,python|pandas|numpy|sklearn|statistics|machine learning|sql,1,3,700000,58333
+JOB007,ML Engineer,Hyderabad,python|tensorflow|pytorch|sklearn|numpy|pandas|mlops,1,3,750000,62500
+JOB008,VLSI Engineer,Bangalore,verilog|systemverilog|digital electronics|vlsi|rtl|fpga|synthesis,1,3,650000,54167
+JOB009,Cloud Engineer,Hyderabad,aws|azure|linux|docker|kubernetes|python|networking,1,3,700000,58333
+JOB010,QA Engineer,Chennai,manual testing|selenium|python|java|sql|api testing|automation,0,2,500000,41667

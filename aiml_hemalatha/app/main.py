@@ -142,23 +142,6 @@ def list_resumes():
     }
 
 
-@app.get("/api/v1/resumes/{resume_id}")
-def get_resume_by_id(resume_id: str):
-    if resume_id not in RESUME_STORE:
-        raise HTTPException(
-            status_code=404,
-            detail="Resume not found"
-        )
-    resume = RESUME_STORE[resume_id]
-    return {
-        "resume_id": resume_id,
-        "filename": resume["filename"],
-        "parsed_skills": resume["parsed_skills"],
-        "raw_text_preview": resume["raw_text_preview"],
-        "status": "parsed"
-    }
-
-
 @app.post("/api/v1/resumes/{resume_id}/parse")
 def parse_resume_by_id(resume_id: str):
 
@@ -201,34 +184,18 @@ def get_ats_score(request: ATSScoreRequest):
     ]
 
     if job.empty:
-        import os, httpx
-        job_service_url = os.getenv("JOB_SERVICE_URL", "http://localhost:8002")
-        job_title = None
-        required_skills = None
-        try:
-            resp = httpx.get(f"{job_service_url}/api/v1/jobs/{job_id}", timeout=3.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                job_title = data.get("title") or data.get("job_title")
-                required_skills = data.get("skills") or data.get("required_skills")
-        except Exception:
-            pass
-
-        if not required_skills and not jobs.empty:
-            job_title = str(jobs.iloc[0].get("job_title", "Software Engineer"))
-            required_skills = jobs.iloc[0]["required_skills"]
-        elif not required_skills:
-            raise HTTPException(
-                status_code=404,
-                detail="Job not found"
-            )
-    else:
-        job_title = str(job.iloc[0]["job_title"])
-        required_skills = job.iloc[0]["required_skills"]
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
 
     resume_skills = RESUME_STORE[
         resume_id
     ]["parsed_skills"]
+
+    required_skills = job.iloc[0][
+        "required_skills"
+    ]
 
     result = calculate_ats_score(
         resume_skills,
@@ -238,14 +205,12 @@ def get_ats_score(request: ATSScoreRequest):
     return {
         "resume_id": resume_id,
         "job_id": job_id,
-        "job_title": job_title,
+        "job_title": str(
+            job.iloc[0]["job_title"]
+        ),
         "ats_score": result["score"],
-        "match_score": result["score"],
-        "score": result["score"],
         "matched_skills": result["matched_skills"],
         "missing_skills": result["missing_skills"],
-        "missing_keywords": result.get("missing_keywords", result["missing_skills"]),
-        "suggestions": [f"Add proficiency in {s}" for s in result["missing_skills"][:3]],
         "generated_by": "heuristic-v0"
     }
 
@@ -489,7 +454,7 @@ def match_resume_with_job(
 # RESUME OPTIMIZATION SUGGESTIONS
 # =========================================================
 
-@app.post("/api/v1/resume/suggestions")
+@app.post("/api/v1/resumes/suggestions")
 def resume_suggestions(
     resume_skills: list[str],
     missing_skills: list[str] = [],
@@ -521,16 +486,16 @@ def recommendations(
 ):
 
     user = TEST_USERS.get(user_id)
-    if user:
-        resume_skills = user["skills"]
-    elif RESUME_STORE:
-        latest_resume = list(RESUME_STORE.values())[-1]
-        resume_skills = latest_resume.get("parsed_skills", []) or ["python", "sql", "git"]
-    else:
-        resume_skills = ["python", "sql", "git"]
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
 
     recommendations_list = get_recommendations(
-        resume_skills=resume_skills,
+        resume_skills=user["skills"],
         user_id=user_id
     )
 

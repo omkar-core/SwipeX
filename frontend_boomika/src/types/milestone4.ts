@@ -132,6 +132,9 @@ export interface AdminAnalyticsData {
   platform_application_trend: { date: string; count: number }[];
   user_growth: { date: string; candidates: number; recruiters: number }[];
   role_split: { role: string; count: number; percentage: number }[];
+  user_types: Record<string, number>;
+  job_status: Record<string, number>;
+  application_stages: Record<string, number>;
   hiring_trend_summary?: {
     total_posted_last_30d: number;
     top_skill: string;

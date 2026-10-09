@@ -891,6 +891,9 @@ export class ApiService {
       active_jobs: 184,
       total_applications: 3890,
       avg_time_to_hire_days: 16.4,
+      user_types: { candidates: 1240, recruiters: 162, admin: 18 },
+      job_status: { active: 184, closed: 45, draft: 12 },
+      application_stages: { New: 120, Shortlisted: 85, Interviewing: 40, Offered: 15, Rejected: 60 },
       platform_application_trend: past7Days.map(p => ({ date: p.date, count: p.count })),
       user_growth: past7Days.map(p => ({ date: p.date, candidates: p.candidates, recruiters: p.recruiters })),
       role_split: [
@@ -1097,6 +1100,103 @@ export class ApiService {
         shortlist_rate: 0.50,
       },
     ];
+  }
+
+  static async getAdminDashboard(): Promise<AdminDashboardData> {
+    if (API_CONFIG.USE_MOCK) {
+      return {
+        total_users: 154,
+        total_job_seekers: 120,
+        total_recruiters: 34,
+        total_jobs: 42,
+        active_jobs: 30,
+        total_applications: 320,
+        pending_items: 5,
+        stats: {
+          total_users: 154,
+          active_jobs: 42,
+          total_applications: 320,
+          avg_time_to_hire_days: 14,
+        },
+      };
+    }
+    return httpRequest<AdminDashboardData>('/api/v1/analytics/admin');
+  }
+
+  static async getAdminUsers(params?: { search?: string; role?: string }): Promise<AdminUserRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return [
+        { id: 'usr-1', name: 'John Doe', email: 'john@example.com', role: 'candidate', created_at: '2026-09-01' },
+        { id: 'usr-2', name: 'Jane Smith', email: 'jane@techcorp.com', role: 'recruiter', created_at: '2026-09-05' },
+      ];
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.role) query.append('role', params.role);
+    return httpRequest<AdminUserRecord[]>(`/api/v1/admin/users?${query.toString()}`);
+  }
+
+  static async getAdminRecruiters(search?: string): Promise<AdminRecruiterRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return [
+        { id: 'rec-1', name: 'Jane Smith', email: 'jane@techcorp.com', company_name: 'Tech Corp', jobs_posted_count: 5 },
+      ];
+    }
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return httpRequest<AdminRecruiterRecord[]>(`/api/v1/admin/recruiters${query}`);
+  }
+
+  static async getAdminJobs(params?: { search?: string; status?: string }): Promise<AdminJobRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return [
+        { id: 'job-1', title: 'Senior Backend Engineer', company: 'Tech Corp', location: 'Remote', status: 'active', applicant_count: 12 },
+      ];
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.status) query.append('status', params.status);
+    return httpRequest<AdminJobRecord[]>(`/api/v1/admin/jobs?${query.toString()}`);
+  }
+
+  static async getAdminApplications(params?: { search?: string; stage?: string }): Promise<AdminApplicationRecord[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return [
+        { id: 'app-1', job_title: 'Senior Backend Engineer', company_name: 'Tech Corp', candidate_name: 'John Doe', status: 'applied', applied_at: '2026-10-01' },
+      ];
+    }
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.stage) query.append('stage', params.stage);
+    return httpRequest<AdminApplicationRecord[]>(`/api/v1/admin/applications?${query.toString()}`);
+  }
+
+  static async getCompanies(params?: { newly_founded?: boolean }): Promise<Company[]> {
+    if (API_CONFIG.USE_MOCK) {
+      return [
+        { id: 'comp-1', company_id: 'comp-1', name: 'Tech Corp', industry: 'Software', is_newly_founded: false, aggregate_rating: 4.8, reviews_count: 85 },
+        { id: 'comp-2', company_id: 'comp-2', name: 'AI Labs Startup', industry: 'Artificial Intelligence', is_newly_founded: true, aggregate_rating: 4.9, reviews_count: 24 },
+      ];
+    }
+    const query = params?.newly_founded ? '?newly_founded=true' : '';
+    return httpRequest<Company[]>(`/api/v1/companies${query}`);
+  }
+
+  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
+    if (API_CONFIG.USE_MOCK) {
+      return {
+        id: companyId,
+        company_id: companyId,
+        name: 'Tech Corp',
+        industry: 'Software',
+        size: '100-500',
+        about: 'Leading technology solutions company building scalable cloud architectures.',
+        is_newly_founded: false,
+        aggregate_rating: 4.8,
+        reviews_count: 85,
+        active_jobs: [],
+      };
+    }
+    return httpRequest<CompanyDetail>(`/api/v1/companies/${companyId}`);
   }
 }
 
@@ -1589,96 +1689,6 @@ export class RecruiterApiService {
       stage_counts: stageCounts,
       avg_time_to_hire_days: 18,
     };
-  }
-
-  static async getAdminDashboard(): Promise<AdminDashboardData> {
-    if (API_CONFIG.USE_MOCK) {
-      return {
-        stats: {
-          total_users: 154,
-          active_jobs: 42,
-          total_applications: 320,
-          avg_time_to_hire_days: 14,
-        },
-      };
-    }
-    return httpRequest<AdminDashboardData>('/api/v1/analytics/admin');
-  }
-
-  static async getAdminUsers(params?: { search?: string; role?: string }): Promise<AdminUserRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return [
-        { id: 'usr-1', name: 'John Doe', email: 'john@example.com', role: 'candidate', created_at: '2026-09-01' },
-        { id: 'usr-2', name: 'Jane Smith', email: 'jane@techcorp.com', role: 'recruiter', created_at: '2026-09-05' },
-      ];
-    }
-    const query = new URLSearchParams();
-    if (params?.search) query.append('search', params.search);
-    if (params?.role) query.append('role', params.role);
-    return httpRequest<AdminUserRecord[]>(`/api/v1/admin/users?${query.toString()}`);
-  }
-
-  static async getAdminRecruiters(search?: string): Promise<AdminRecruiterRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return [
-        { id: 'rec-1', name: 'Jane Smith', email: 'jane@techcorp.com', company_name: 'Tech Corp', jobs_posted_count: 5 },
-      ];
-    }
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    return httpRequest<AdminRecruiterRecord[]>(`/api/v1/admin/recruiters${query}`);
-  }
-
-  static async getAdminJobs(params?: { search?: string; status?: string }): Promise<AdminJobRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return [
-        { id: 'job-1', title: 'Senior Backend Engineer', company: 'Tech Corp', location: 'Remote', status: 'active', applicant_count: 12 },
-      ];
-    }
-    const query = new URLSearchParams();
-    if (params?.search) query.append('search', params.search);
-    if (params?.status) query.append('status', params.status);
-    return httpRequest<AdminJobRecord[]>(`/api/v1/admin/jobs?${query.toString()}`);
-  }
-
-  static async getAdminApplications(params?: { search?: string; stage?: string }): Promise<AdminApplicationRecord[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return [
-        { id: 'app-1', job_title: 'Senior Backend Engineer', company_name: 'Tech Corp', candidate_name: 'John Doe', status: 'applied', applied_at: '2026-10-01' },
-      ];
-    }
-    const query = new URLSearchParams();
-    if (params?.search) query.append('search', params.search);
-    if (params?.stage) query.append('stage', params.stage);
-    return httpRequest<AdminApplicationRecord[]>(`/api/v1/admin/applications?${query.toString()}`);
-  }
-
-  static async getCompanies(params?: { newly_founded?: boolean }): Promise<Company[]> {
-    if (API_CONFIG.USE_MOCK) {
-      return [
-        { id: 'comp-1', company_id: 'comp-1', name: 'Tech Corp', industry: 'Software', is_newly_founded: false, aggregate_rating: 4.8, reviews_count: 85 },
-        { id: 'comp-2', company_id: 'comp-2', name: 'AI Labs Startup', industry: 'Artificial Intelligence', is_newly_founded: true, aggregate_rating: 4.9, reviews_count: 24 },
-      ];
-    }
-    const query = params?.newly_founded ? '?newly_founded=true' : '';
-    return httpRequest<Company[]>(`/api/v1/companies${query}`);
-  }
-
-  static async getCompanyById(companyId: string): Promise<CompanyDetail> {
-    if (API_CONFIG.USE_MOCK) {
-      return {
-        id: companyId,
-        company_id: companyId,
-        name: 'Tech Corp',
-        industry: 'Software',
-        size: '100-500',
-        about: 'Leading technology solutions company building scalable cloud architectures.',
-        is_newly_founded: false,
-        aggregate_rating: 4.8,
-        reviews_count: 85,
-        active_jobs: [],
-      };
-    }
-    return httpRequest<CompanyDetail>(`/api/v1/companies/${companyId}`);
   }
 }
 

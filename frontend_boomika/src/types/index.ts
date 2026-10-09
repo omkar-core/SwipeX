@@ -371,7 +371,14 @@ export interface CandidateAnalyticsData {
 export * from './milestone4';
 
 export interface AdminDashboardData {
-  stats: {
+  total_users: number;
+  total_job_seekers: number;
+  total_recruiters: number;
+  total_jobs: number;
+  active_jobs: number;
+  total_applications: number;
+  pending_items: number;
+  stats?: {
     total_users: number;
     active_jobs: number;
     total_applications: number;
@@ -437,6 +444,7 @@ export interface Company {
 }
 
 export interface CompanyDetail extends Company {
+  jobs?: Job[];
   active_jobs?: Job[];
   overview?: string;
   tech_stack?: string[];

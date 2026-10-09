@@ -936,6 +936,9 @@ export class ApiAdapter {
       active_jobs: Number(raw.active_jobs ?? raw.jobs_count ?? 184),
       total_applications: Number(raw.total_applications ?? raw.applications_count ?? 3890),
       avg_time_to_hire_days: Number(raw.avg_time_to_hire_days ?? raw.avg_time_to_hire ?? 16.4),
+      user_types: raw.user_types || { candidates: 1240, recruiters: 162, admin: 18 },
+      job_status: raw.job_status || { active: 184, closed: 45, draft: 12 },
+      application_stages: raw.application_stages || { New: 120, Shortlisted: 85, Interviewing: 40, Offered: 15, Rejected: 60 },
       platform_application_trend: Array.isArray(raw.platform_application_trend)
         ? raw.platform_application_trend.map((item: any) => ({
             date: item.date || 'Day',

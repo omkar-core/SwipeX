@@ -14,6 +14,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app import models
 from app.database import Base, engine
 
 

@@ -1,25 +1,31 @@
 """
-Auth & Identity service — Day 3: real working logic behind every route.
+Auth & Identity service — Milestone 4: Notifications, Analytics & Application Tracking.
 
 Run with:  uvicorn app.main:app --reload --port 8001
 """
 from dotenv import load_dotenv
 load_dotenv()
 import os
+import time
 from datetime import datetime
+from typing import Dict, Tuple
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.requests import Request
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, Response
 
 from app.database import Base, engine, get_db
-from app import schemas, security
-from app.models import User, RefreshToken, Role, AuthProvider
+from app import schemas, security, models
+from app.models import User, RefreshToken, Role, AuthProvider, Notification, AlertPreference, JobApplication, ApplicationStatusHistory
 from app.deps import get_current_user, require_role
 from app.gateway import router as gateway_router
+
+from app.routers.notifications import router as notifications_router
+from app.routers.applications import router as applications_router
+from app.routers.competition import router as competition_router
+from app.routers.analytics import router as analytics_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -28,15 +34,13 @@ app = FastAPI(
     version="0.4.0",
     description=(
         "Handles registration, login (email/password + Google OAuth2), "
-        "JWT issuing/refresh, and role-based access control (RBAC) for "
-        "SwipeX. Also acts as the API Gateway, forwarding authenticated "
-        "requests to the Job/Swipe and Resume/ATS services.\n\n"
-        "**Day 6 note:** see `docs/testing.md` for the test suite and "
-        "known limitations."
+        "JWT issuing/refresh, role-based access control (RBAC), and Milestone 4 "
+        "Notifications, Application Tracking, Job Competition, and Analytics.\n\n"
+        "Acts as the API Gateway, forwarding authenticated requests to downstream services."
     ),
 )
 
-# Enable CORS middleware for frontend and cross-service calls
+# Enable CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,9 +52,31 @@ app.add_middleware(
 # Needed by Authlib to store OAuth state between redirect and callback.
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET_KEY", "dev-only-session-secret"))
 
+# ---------------------------------------------------------------------------
+# Security Hardening & Rate Limiting Middleware
+# ---------------------------------------------------------------------------
+RATE_LIMIT_STORE: Dict[str, Tuple[int, float]] = {}  # ip -> (count, reset_time)
+MAX_REQUESTS_PER_MINUTE = 120
+
+
+@app.middleware("http")
+async def security_and_rate_limit_middleware(request: Request, call_next):
+    # Security Headers
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 Base.metadata.create_all(bind=engine)
 
-# Job/Resume service proxy routes (Day 4) — see gateway.py
+# Include Routers
+app.include_router(notifications_router)
+app.include_router(applications_router)
+app.include_router(competition_router)
+app.include_router(analytics_router)
 app.include_router(gateway_router)
 
 # ---------------------------------------------------------------------------
@@ -68,7 +94,7 @@ oauth.register(
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "auth-service"}
+    return {"status": "ok", "service": "auth-service", "milestone": 4}
 
 
 # ---------------------------------------------------------------------------
@@ -141,11 +167,6 @@ def _issue_token_pair(user: User, db: Session) -> schemas.TokenResponse:
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/auth/oauth/google")
 async def oauth_google_login(request: Request):
-    """
-    Kicks off the Google login redirect. In a browser flow, the frontend
-    sends the user here; Google redirects back to the callback below.
-    Requires GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET to be set (see README).
-    """
     redirect_uri = request.url_for("oauth_google_callback")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
@@ -163,7 +184,6 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
 
     user = db.query(User).filter(User.oauth_id == google_id).first()
     if not user:
-        # First time this Google account has logged in — auto-register them
         user = User(
             name=name,
             email=email,
@@ -177,9 +197,6 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
         db.refresh(user)
 
     token_pair = _issue_token_pair(user, db)
-    # In production this would redirect to the frontend with the tokens
-    # (e.g. as a URL fragment or a short-lived code). Returned directly
-    # here for Milestone 1 API testing via Postman/Swagger.
     return token_pair
 
 
@@ -190,7 +207,6 @@ async def oauth_google_callback(request: Request, db: Session = Depends(get_db))
     "/api/v1/auth/refresh",
     response_model=schemas.RefreshResponse,
     summary="Exchange a refresh token for a new access token",
-    description="Used when an access token expires, so the user doesn't have to log in again for 30 days.",
     tags=["Auth"],
 )
 def refresh(payload: schemas.RefreshRequest, db: Session = Depends(get_db)):
@@ -214,7 +230,6 @@ def refresh(payload: schemas.RefreshRequest, db: Session = Depends(get_db)):
     "/api/v1/auth/me",
     response_model=schemas.MeResponse,
     summary="Get the current logged-in user",
-    description="Requires a valid Bearer access token. Returns the user's id, name, and role.",
     tags=["Auth"],
 )
 def me(current_user: User = Depends(get_current_user)):

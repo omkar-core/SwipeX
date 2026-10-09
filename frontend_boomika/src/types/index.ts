@@ -370,5 +370,79 @@ export interface CandidateAnalyticsData {
 
 export * from './milestone4';
 
+export interface AdminDashboardData {
+  stats: {
+    total_users: number;
+    active_jobs: number;
+    total_applications: number;
+    avg_time_to_hire_days?: number;
+  };
+  overview?: Record<string, any>;
+  users_by_role?: Record<string, number>;
+  jobs_by_status?: Record<string, number>;
+  applications_by_stage?: Record<string, number>;
+}
+
+export interface AdminUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  created_at?: string;
+  status?: string;
+}
+
+export interface AdminRecruiterRecord {
+  id: string;
+  name: string;
+  email: string;
+  company_name?: string;
+  jobs_posted_count?: number;
+  created_at?: string;
+}
+
+export interface AdminJobRecord {
+  id: string;
+  title: string;
+  company: string;
+  location?: string;
+  status: string;
+  posted_at?: string;
+  applicant_count?: number;
+}
+
+export interface AdminApplicationRecord {
+  id: string;
+  job_title: string;
+  company_name: string;
+  candidate_name: string;
+  status: string;
+  applied_at?: string;
+}
+
+export interface Company {
+  id: string;
+  company_id?: string;
+  name: string;
+  industry?: string;
+  company_type?: string;
+  about?: string;
+  location?: string;
+  size?: string;
+  is_newly_founded?: boolean;
+  aggregate_rating?: number;
+  reviews_count?: number;
+  website_url?: string;
+  active_jobs_count?: number;
+}
+
+export interface CompanyDetail extends Company {
+  active_jobs?: Job[];
+  overview?: string;
+  tech_stack?: string[];
+  culture_highlights?: string[];
+}
+
+
 
 

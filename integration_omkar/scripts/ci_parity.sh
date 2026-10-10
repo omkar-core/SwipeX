@@ -5,6 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 echo "=== SWIPEX CI-PARITY CLEAN-ROOM TEST RUNNER ==="
+
+# 1. Gitleaks Secret Scan Parity Gate
+echo "Running Secret Leak Detection Parity Gate (Gitleaks v8.24.3)..."
+if command -v docker &> /dev/null; then
+  docker run --rm \
+    -v "${REPO_ROOT}:/repo" \
+    zricethezav/gitleaks:v8.24.3 detect \
+    --source /repo --redact --no-banner --config /repo/.gitleaks.toml
+elif command -v gitleaks &> /dev/null; then
+  gitleaks detect --source . --redact --no-banner --config .gitleaks.toml
+fi
+
 echo "Starting clean python:3.11-slim Linux container..."
 
 docker run --rm \

@@ -96,7 +96,50 @@ curl.exe -s http://localhost:8003/health
 
 ---
 
-## 4. Teardown
+## 4. Secret Leak Detection & Local Gitleaks Gate
+
+Run the local parity secret scan before every commit and push:
+
+### Docker Container (Official Pinned Image):
+```bash
+# Linux / macOS / Git Bash
+docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.24.3 detect \
+  --source /repo --redact --no-banner --config /repo/.gitleaks.toml
+
+# Windows PowerShell
+docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.24.3 detect `
+  --source /repo --redact --no-banner --config /repo/.gitleaks.toml
+```
+
+### Local Pinned CLI (Native Binary):
+```bash
+# Scan full git history
+gitleaks detect --source . --redact --verbose --no-banner --config .gitleaks.toml
+
+# Scan uncommitted working tree
+gitleaks detect --source . --no-git --redact --verbose --no-banner --config .gitleaks.toml
+
+# Scan PR commit range only
+gitleaks detect --source . --redact --verbose --no-banner --config .gitleaks.toml --log-opts="origin/main..HEAD"
+```
+
+### Optional Local Pre-Commit Hook (Prevent Accidental Secret Leaks):
+To run `gitleaks protect --staged --redact` automatically before every `git commit`:
+```bash
+# Linux / macOS
+cp integration_omkar/scripts/pre-commit-gitleaks.sh .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+
+# Windows PowerShell
+# Create a wrapper .git/hooks/pre-commit containing:
+# powershell -ExecutionPolicy Bypass -File integration_omkar/scripts/pre-commit-gitleaks.ps1
+```
+*(Hooks are optional for local developers and are not auto-installed).*
+
+---
+
+## 5. Teardown
 ```powershell
 docker compose -f docker-compose.dev.yml down -v
 ```
+

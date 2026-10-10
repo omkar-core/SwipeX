@@ -59,22 +59,78 @@ jobs:
           npm run lint
 
   # ---------------------------------------------------------------------------
-  # 2. Secret Scan Gate: Pinned Gitleaks Action
+  # 2. Secret Scan Gate: Pinned Gitleaks CLI (Least Privilege, API-Free)
   # ---------------------------------------------------------------------------
   secret-scan:
     name: Secret Leak Detection Gate (Gitleaks)
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: "8.24.3"
+      GITLEAKS_SHA256: "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
     steps:
-      - name: Check out repository
+      - name: Check out repository (Full History)
         uses: actions/checkout@v6
         with:
-          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
+          fetch-depth: 0
 
-      - name: Run Gitleaks Secret Scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
+      - name: Install & Verify Pinned Gitleaks CLI
+        run: |
+          echo "Downloading Gitleaks v${GITLEAKS_VERSION} official release tarball..."
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o checksums.txt
+
+          echo "Verifying tarball sha256 checksum against official release checksums file..."
+          grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" checksums.txt | sha256sum -c -
+
+          echo "Verifying against pinned sha256 digest..."
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan Git Commits for Leaked Secrets
+        run: |
+          CONFIG_ARGS=""
+          if [ -f ".gitleaks.toml" ]; then
+            CONFIG_ARGS="--config .gitleaks.toml"
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Pull Request Scan: scanning commits in range origin/${{ github.base_ref }}..HEAD"
+            gitleaks detect --source . --redact --verbose --no-banner \
+              --log-opts="origin/${{ github.base_ref }}..HEAD" \
+              --report-path gitleaks-commits-report.json --report-format json \
+              $CONFIG_ARGS --exit-code 1
+          else
+            echo "Push / Workflow Dispatch / Scheduled Scan: scanning full git history"
+            gitleaks detect --source . --redact --verbose --no-banner \
+              --report-path gitleaks-commits-report.json --report-format json \
+              $CONFIG_ARGS --exit-code 1
+          fi
+
+      - name: Scan Working Tree for Uncommitted & Generated Files
+        run: |
+          CONFIG_ARGS=""
+          if [ -f ".gitleaks.toml" ]; then
+            CONFIG_ARGS="--config .gitleaks.toml"
+          fi
+
+          echo "Working tree scan: scanning active workspace files"
+          gitleaks detect --source . --no-git --redact --verbose --no-banner \
+            --report-path gitleaks-workingtree-report.json --report-format json \
+            $CONFIG_ARGS --exit-code 1
+
+      - name: Upload Redacted Gitleaks Scan Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-secret-scan-report
+          path: gitleaks-*.json
+          if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
   # 3. Frontend Quality Gate: Vitest, ESLint & Production Build

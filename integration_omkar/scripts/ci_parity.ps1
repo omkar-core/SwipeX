@@ -4,6 +4,16 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path.Replace('\', '/')
 
 Write-Host "=== SWIPEX CI-PARITY CLEAN-ROOM TEST RUNNER ===" -ForegroundColor Cyan
+
+# 1. Gitleaks Secret Scan Parity Gate
+Write-Host "Running Secret Leak Detection Parity Gate (Gitleaks v8.24.3)..." -ForegroundColor Cyan
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+    docker run --rm -v "${RepoRoot}:/repo" zricethezav/gitleaks:v8.24.3 detect `
+      --source /repo --redact --no-banner --config /repo/.gitleaks.toml
+} elseif (Get-Command gitleaks -ErrorAction SilentlyContinue) {
+    gitleaks detect --source . --redact --no-banner --config .gitleaks.toml
+}
+
 Write-Host "Starting clean python:3.11-slim Linux container..." -ForegroundColor Cyan
 
 # Mount workspace and run in Linux clean room

@@ -113,6 +113,9 @@ docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.24.3 detect `
 
 ### Local Pinned CLI (Native Binary):
 ```bash
+# Automated install & sha256 checksum verification:
+bash integration_omkar/scripts/install_gitleaks.sh
+
 # Scan full git history
 gitleaks detect --source . --redact --verbose --no-banner --config .gitleaks.toml
 

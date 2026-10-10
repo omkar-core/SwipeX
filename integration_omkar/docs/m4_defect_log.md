@@ -18,6 +18,7 @@
 | **DEF-016** | Medium | P2 | Job 1 applicant count (45) failed strict `applicant_count > 50` HIGH competition threshold | Data & Seed / Hanith (Intern 3) | Resolved by updating seed count to 55 in `seed_all.py` |
 | **DEF-040** | Low | P3 | Tracked `.env.test` file present in frontend directory | Frontend / Boomika (Intern 1) | Patch handed to owner (`frontend_boomika_untrack_env_test.patch`); .gitignore hardened |
 | **DEF-041** | Medium | P2 | Hardcoded literal `postgres:postgres` DB URI in QA performance validation script | Data / Hanith (Intern 3) | Patch handed to owner (`data_hanith_hardcoded_credentials.patch`) |
+| **DEF-042** | High | P1 | Gitleaks sha256 checksum filename mismatch in CI installer step (Run #68) | Platform & CI / Omkar (Intern 5) | Resolved via `install_gitleaks.sh` preserving asset filenames & mktemp verification |
 
 
 ---
@@ -99,3 +100,15 @@
 - **Resolution:**
   1. Integrator: Maintained read-only integrity for `data_hanith/`.
   2. Owner Defect Handed to Hanith: Created patch `integration_omkar/patches/data_hanith_hardcoded_credentials.patch` updating line 15 to use `os.getenv("JOB_DATABASE_URL", "postgresql://swipex:swipex@127.0.0.1:5432/swipex_job")`.
+
+### DEF-042: Gitleaks sha256 Checksum Filename Mismatch in CI Installer (Run #68)
+- **Severity:** High (P1)
+- **Component:** `.github/workflows/ci.yml`, `integration_omkar/scripts/install_gitleaks.sh`
+- **Observed Behavior:** CI Run #68 failed with `sha256sum: gitleaks_8.24.3_linux_x64.tar.gz: No such file or directory`.
+- **Root Cause:** In the initial CLI installer, `curl -o gitleaks.tar.gz` renamed the tarball locally to `gitleaks.tar.gz`, while `gitleaks_8.24.3_checksums.txt` specifies the official filename `gitleaks_8.24.3_linux_x64.tar.gz`. Running `sha256sum -c` failed to locate the file by its original name.
+- **Resolution:**
+  1. Created standalone installer `integration_omkar/scripts/install_gitleaks.sh`.
+  2. Uses `mktemp -d` and downloads release assets preserving their original filenames (`gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz` and `gitleaks_${GITLEAKS_VERSION}_checksums.txt`).
+  3. Extracts expected hash with `grep " ${TARBALL}\$" "${CHECKSUMS}" > expected.sha256`, validates non-empty with `test -s`, and executes `sha256sum -c expected.sha256`.
+  4. Added negative test validation proving corrupted hashes fail with non-zero exit code.
+

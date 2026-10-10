@@ -78,19 +78,7 @@ jobs:
 
       - name: Install & Verify Pinned Gitleaks CLI
         run: |
-          echo "Downloading Gitleaks v${GITLEAKS_VERSION} official release tarball..."
-          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tar.gz
-          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o checksums.txt
-
-          echo "Verifying tarball sha256 checksum against official release checksums file..."
-          grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" checksums.txt | sha256sum -c -
-
-          echo "Verifying against pinned sha256 digest..."
-          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
-
-          tar -xzf gitleaks.tar.gz gitleaks
-          sudo mv gitleaks /usr/local/bin/gitleaks
-          gitleaks version
+          bash integration_omkar/scripts/install_gitleaks.sh
 
       - name: Scan Git Commits for Leaked Secrets
         run: |
@@ -100,6 +88,8 @@ jobs:
           fi
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Fetching base branch origin/${{ github.base_ref }} for PR commit range..."
+            git fetch origin ${{ github.base_ref }} || true
             echo "Pull Request Scan: scanning commits in range origin/${{ github.base_ref }}..HEAD"
             gitleaks detect --source . --redact --verbose --no-banner \
               --log-opts="origin/${{ github.base_ref }}..HEAD" \

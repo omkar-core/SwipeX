@@ -46,6 +46,28 @@ Instead of expanding workflow permissions or relying on GitHub API calls, we rep
 - Pinning and verifying release sha256 (`9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c`) protects against supply chain attacks.
 - Scans both Git commits and active working tree uncommitted files (`--no-git`).
 
+### D. Checksum Step Resolution (Run #68)
+In CI Run #68, the initial CLI installer step produced:
+```text
+Downloading Gitleaks v8.24.3 official release tarball...
+Verifying tarball sha256 checksum against official release checksums file...
+sha256sum: gitleaks_8.24.3_linux_x64.tar.gz: No such file or directory
+gitleaks_8.24.3_linux_x64.tar.gz: FAILED open or read
+```
+**Root Cause:** The `curl -o gitleaks.tar.gz` command saved the tarball under a generic filename (`gitleaks.tar.gz`), whereas `gitleaks_8.24.3_checksums.txt` lists the hash against the exact original asset name (`gitleaks_8.24.3_linux_x64.tar.gz`). When `sha256sum -c` was executed, it searched for the original filename in the directory and failed.
+
+**Permanent Fix (`integration_omkar/scripts/install_gitleaks.sh`):**
+1. Created an isolated scratch directory (`mktemp -d`).
+2. Downloaded assets preserving their exact original names via `curl -fsSL --retry 3 --retry-delay 2 -O`:
+   - Tarball: `gitleaks_8.24.3_linux_x64.tar.gz`
+   - Checksums file: `gitleaks_8.24.3_checksums.txt`
+3. Extracted only the exact tarball line from the checksums file:
+   `grep " ${TARBALL}\$" "${CHECKSUMS}" > expected.sha256`
+   `test -s expected.sha256`
+   `sha256sum -c expected.sha256`
+4. Extracted the verified binary and installed to `$RUNNER_TEMP/bin` (added to `$GITHUB_PATH`) or `/usr/local/bin`.
+5. Added negative test verification (`CORRUPT_CHECKSUM_FOR_TEST=1`) proving that any hash mismatch exits non-zero.
+
 ---
 
 ## 3. Gitleaks Scan Results & Findings Classification

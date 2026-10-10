@@ -15,6 +15,9 @@ if command -v docker &> /dev/null; then
     --source /repo --redact --no-banner --config /repo/.gitleaks.toml
 elif command -v gitleaks &> /dev/null; then
   gitleaks detect --source . --redact --no-banner --config .gitleaks.toml
+else
+  bash "${SCRIPT_DIR}/install_gitleaks.sh"
+  gitleaks detect --source . --redact --no-banner --config .gitleaks.toml
 fi
 
 echo "Starting clean python:3.11-slim Linux container..."

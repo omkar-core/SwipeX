@@ -1,0 +1,25 @@
+# Gitleaks configuration and false positive allowlist for SwipeX
+# Pinned for Milestone 4 CI Secret Scanning Gate
+title = "SwipeX Gitleaks Configuration"
+
+[allowlist]
+description = "Confirmed false positives and archived test payloads"
+paths = [
+    # Nginx reverse proxy upstream path directives (matches proxy_pass .../api/v1/...)
+    '''(?i)gateway/nginx\.conf''',
+    # Architectural markdown documentation files describing ATS/Suggestions API
+    '''(?i)Team-3/Domain-1/backend/.*\.md''',
+    # Frontend localStorage cache key constant ('swipex_applications_v4')
+    '''(?i)frontend_boomika/src/services/applicationService\.ts''',
+    # Archived Milestone 1 localhost test response containing ephemeral dev JWT
+    '''(?i)integration_omkar/m1_final_audit\.md''',
+]
+
+regexes = [
+    # Allow localStorage cache key name
+    '''swipex_applications_v4''',
+    # Allow Nginx proxy URI fragments
+    '''8000/api/v1/(?:companies|recommendations)/''',
+    # Allow architectural markdown diagram text
+    '''ATS/Suggestions''',
+]

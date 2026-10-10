@@ -1,0 +1,10 @@
+# Proposed fix for DEF-040 (Tracked .env.test in frontend_boomika)
+# Instructions for Boomika (Frontend Owner):
+# Run the following git command to stop tracking .env.test without deleting the local file:
+#
+#   git rm --cached frontend_boomika/.env.test
+#   git commit -m "chore(frontend): untrack .env.test to enforce clean secret audit"
+#
+# Root .gitignore has already been updated by Integrator (Omkar) with:
+#   .env.*
+#   !.env.example

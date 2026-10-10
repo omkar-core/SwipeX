@@ -257,12 +257,23 @@ def run_suite_integration_unit() -> SuiteResult:
     cmd_parser = [sys.executable, "-m", "pytest", "integration_omkar/tests/unit/test_run_suites_parser.py", "-v", "--tb=short"]
     res_parser = run_cmd(cmd_parser, cwd=BASE_DIR, env=env_parser, suite_name="runner-parser-unit")
 
+    env_secrets = os.environ.copy()
+    env_secrets["PYTHONPATH"] = f"{BASE_DIR}"
+    cmd_secrets = [sys.executable, "-m", "pytest", "integration_omkar/tests/test_no_secrets_committed.py", "-v", "--tb=short"]
+    res_secrets = run_cmd(cmd_secrets, cwd=BASE_DIR, env=env_secrets, suite_name="no-secrets-unit")
+
     combined = SuiteResult("integration-unit")
-    combined.passed = res_aiml.passed + res_gateway.passed + res_parser.passed
-    combined.failed = res_aiml.failed + res_gateway.failed + res_parser.failed
-    combined.skipped = res_aiml.skipped + res_gateway.skipped + res_parser.skipped
-    combined.duration = res_aiml.duration + res_gateway.duration + res_parser.duration
-    combined.exit_code = 0 if (res_aiml.exit_code == 0 and res_gateway.exit_code == 0 and res_parser.exit_code == 0 and combined.failed == 0) else 1
+    combined.passed = res_aiml.passed + res_gateway.passed + res_parser.passed + res_secrets.passed
+    combined.failed = res_aiml.failed + res_gateway.failed + res_parser.failed + res_secrets.failed
+    combined.skipped = res_aiml.skipped + res_gateway.skipped + res_parser.skipped + res_secrets.skipped
+    combined.duration = res_aiml.duration + res_gateway.duration + res_parser.duration + res_secrets.duration
+    combined.exit_code = 0 if (
+        res_aiml.exit_code == 0
+        and res_gateway.exit_code == 0
+        and res_parser.exit_code == 0
+        and res_secrets.exit_code == 0
+        and combined.failed == 0
+    ) else 1
     return combined
 
 def run_suite_flake8() -> SuiteResult:

@@ -11,10 +11,16 @@ venv/
 venv311/
 .venv/
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*serviceAccount*.json
+*.db
+*.sqlite*
 .git/
 TSconfig.tsbuildinfo
 **/*.tsbuildinfo
 data/raw/
 *.xlsx
-*.db
 .pytest_cache/

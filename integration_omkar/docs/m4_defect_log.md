@@ -16,6 +16,9 @@
 | **DEF-014** | High | P1 | Top-level `app` Python package namespace collision across test suites | Platform / Omkar (Intern 5) | Resolved via isolated subprocess runner `run_suites.py` |
 | **DEF-015** | High | P1 | MinIO Docker Hub pull access denied in GitHub Actions CI | DevOps / Omkar (Intern 5) | Resolved by pinning `quay.io/minio/minio:RELEASE.2024-11-07T00-52-49Z` |
 | **DEF-016** | Medium | P2 | Job 1 applicant count (45) failed strict `applicant_count > 50` HIGH competition threshold | Data & Seed / Hanith (Intern 3) | Resolved by updating seed count to 55 in `seed_all.py` |
+| **DEF-040** | Low | P3 | Tracked `.env.test` file present in frontend directory | Frontend / Boomika (Intern 1) | Patch handed to owner (`frontend_boomika_untrack_env_test.patch`); .gitignore hardened |
+| **DEF-041** | Medium | P2 | Hardcoded literal `postgres:postgres` DB URI in QA performance validation script | Data / Hanith (Intern 3) | Patch handed to owner (`data_hanith_hardcoded_credentials.patch`) |
+
 
 ---
 
@@ -78,3 +81,21 @@
 - **Observed Behavior:** CI `m3-schema` test suite failed with 38 errors `sqlite3.OperationalError: no such table: jobs`.
 - **Root Cause:** The tests default to SQLite database at `data/swipex_job.db` when `DATABASE_URL` is unset. SQLite `.db` files are rightly gitignored and not committed. On clean CI runners, the database file did not exist, so table queries threw SQLite OperationalError.
 - **Resolution:** Implemented `integration_omkar/scripts/bootstrap_test_db.py`, which is called automatically prior to running `m3-schema` and `m4` test suites. It executes Hanith's canonical `schema.sql`, applies `apply_m4_migration.py` (unmodified), and ensures baseline test job seeds exist. Database is created deterministically on the fly in transient CI storage without committing `.db` binaries to Git.
+
+### DEF-040: Tracked .env.test File in Frontend Repository Directory
+- **Severity:** Low (P3)
+- **Component:** `frontend_boomika/.env.test`
+- **Observed Behavior:** Automated secrets audit identified `frontend_boomika/.env.test` as a tracked file matching `git ls-files | findstr "\.env"`.
+- **Root Cause:** In Milestone 3, a Vite test configuration file (`.env.test`) was committed to the repository containing mock flags and localhost URLs. While it contains no real secrets, tracked `.env.*` files violate strict secrets isolation principles.
+- **Resolution:**
+  1. Integrator: Hardened root `.gitignore` and `.dockerignore` to explicitly ignore `.env.*` while allowing only `.env.example`. Added allowlist entry in `.gitleaks.toml`.
+  2. Owner Defect Handed to Boomika: Created patch `integration_omkar/patches/frontend_boomika_untrack_env_test.patch` documenting `git rm --cached frontend_boomika/.env.test` for execution by the frontend owner.
+
+### DEF-041: Hardcoded Literal Database URI in QA Performance Script
+- **Severity:** Medium (P2)
+- **Component:** `data_hanith/scripts/validate_day6_qa_performance.py:15`
+- **Observed Behavior:** Automated regex scanning identified a hardcoded database URI `os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@127.0.0.1:5432/swipex_job_db"`.
+- **Root Cause:** A test script used for validating ingestion performance hardcoded fallback credentials rather than reading from environment variables or `.env`.
+- **Resolution:**
+  1. Integrator: Maintained read-only integrity for `data_hanith/`.
+  2. Owner Defect Handed to Hanith: Created patch `integration_omkar/patches/data_hanith_hardcoded_credentials.patch` updating line 15 to use `os.getenv("JOB_DATABASE_URL", "postgresql://swipex:swipex@127.0.0.1:5432/swipex_job")`.

@@ -9,3 +9,12 @@ node_modules/
 .v/
 venv311/
 integration_omkar/.venv/
+
+# Secrets, certificates, databases & sensitive env configs (M4 Security Gate)
+.env.*
+!.env.example
+*.pem
+*.key
+*serviceAccount*.json
+*.sqlite*
+dist/

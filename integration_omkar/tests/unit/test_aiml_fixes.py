@@ -1,5 +1,17 @@
+import os
 import sys
+import types
 from unittest.mock import MagicMock
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+AIML_DIR = os.path.join(BASE_DIR, "aiml_hemalatha")
+if AIML_DIR not in sys.path:
+    sys.path.insert(0, AIML_DIR)
+
+# Dynamically point 'app' package to aiml_hemalatha/app to prevent collision with backend_mansi
+aiml_app = types.ModuleType("app")
+aiml_app.__path__ = [os.path.join(AIML_DIR, "app")]
+sys.modules["app"] = aiml_app
 
 if "sentence_transformers" not in sys.modules:
     mock_st = MagicMock()

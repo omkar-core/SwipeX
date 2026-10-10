@@ -239,6 +239,7 @@ async def gateway_recommendations(request: Request, current_user: User = Depends
 # ---------------------------------------------------------------------------
 
 @router.post("/api/v1/resumes/upload")
+@router.post("/api/v1/resume/upload")
 async def gateway_resume_upload(
     request: Request,
     current_user: User = Depends(require_role("job_seeker")),

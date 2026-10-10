@@ -14,3 +14,7 @@ venv311/
 .git/
 TSconfig.tsbuildinfo
 **/*.tsbuildinfo
+data/raw/
+*.xlsx
+*.db
+.pytest_cache/

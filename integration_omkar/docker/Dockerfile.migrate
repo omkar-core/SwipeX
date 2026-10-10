@@ -1,0 +1,26 @@
+# Python 3.11 image for DB Migration & Seeding (Intern 5)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    sqlalchemy==2.0.35 \
+    psycopg2-binary==2.9.9 \
+    passlib==1.7.4 \
+    "bcrypt<4.0.0" \
+    python-jose[cryptography]==3.3.0 \
+    pydantic==2.9.2 \
+    email-validator==2.2.0 \
+    python-dotenv==1.0.1
+
+COPY . /app/
+
+CMD ["python", "integration_omkar/deploy/migrate_and_seed.py"]

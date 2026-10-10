@@ -1,5 +1,6 @@
 # SwipeX Milestone 4 — Render Infrastructure as Code (Blueprint)
 # Specification: https://render.com/docs/blueprint-spec
+# Verified for Render Free Tier Limits (October 2026)
 
 databases:
   - name: swipex-postgres
@@ -10,7 +11,15 @@ databases:
 
 services:
   # ---------------------------------------------------------------------------
-  # 1. Frontend Web Client (Static Site on Global CDN)
+  # 1. Key Value / Redis Cache Store (Free Tier: 25 MB RAM, 50 conns)
+  # ---------------------------------------------------------------------------
+  - type: keyvalue
+    name: swipex-redis
+    plan: free
+    region: oregon
+
+  # ---------------------------------------------------------------------------
+  # 2. Frontend Web Client (Static Site on Global CDN)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-frontend
@@ -40,22 +49,28 @@ services:
         value: "false"
 
   # ---------------------------------------------------------------------------
-  # 2. Auth Service & API Gateway (Web Service with WebSocket support)
+  # 3. Auth Service & API Gateway (Web Service with WebSocket support)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-auth-gateway
     runtime: python
     plan: free
     region: oregon
-    rootDir: backend_mansi
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r backend_mansi/requirements.txt -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
+    startCommand: python integration_omkar/deploy/entrypoint_render.py --app backend_mansi.app.main:app
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: swipex-postgres
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: swipex-redis
+          property: connectionString
+      - key: RUN_MIGRATION
+        value: "true"
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: SESSION_SECRET_KEY
@@ -72,16 +87,15 @@ services:
         value: https://swipex-frontend.onrender.com
 
   # ---------------------------------------------------------------------------
-  # 3. Job & Data Intelligence Service (Web Service)
+  # 4. Job & Data Intelligence Service (Web Service)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-job-service
     runtime: python
     plan: free
     region: oregon
-    rootDir: data_hanith
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
+    startCommand: python integration_omkar/deploy/entrypoint_render.py --app data_hanith.main:app
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
@@ -97,16 +111,15 @@ services:
         value: "true"
 
   # ---------------------------------------------------------------------------
-  # 4. Resume & AI Career Intelligence Service (Web Service)
+  # 5. Resume & AI Career Intelligence Service (Web Service)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-resume-service
     runtime: python
     plan: free
     region: oregon
-    rootDir: aiml_hemalatha
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r aiml_hemalatha/requirements.txt -r integration_omkar/requirements-prod.txt
+    startCommand: python integration_omkar/deploy/entrypoint_render.py --app aiml_hemalatha.app.main:app
     healthCheckPath: /health
     envVars:
       - key: JOB_SERVICE_URL

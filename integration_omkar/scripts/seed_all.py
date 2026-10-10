@@ -37,8 +37,8 @@ CURATED_SEED_JOBS = [
         "job_type": "FULL_TIME",
         "skills": ["Python", "FastAPI", "React", "TypeScript", "PostgreSQL", "Docker"],
         "description": "Join Nexus Technologies to architect modern swipe-based web platforms using FastAPI and React.",
-        "applicant_count": 45,
-        "competition_level": "MEDIUM"
+        "applicant_count": 55,
+        "competition_level": "HIGH"
     },
     {
         "title": "AI/ML Solutions Architect",
@@ -103,7 +103,7 @@ CURATED_SEED_JOBS = [
         "job_type": "FULL_TIME",
         "skills": ["Docker", "Kubernetes", "AWS", "GitHub Actions", "PostgreSQL", "Linux"],
         "description": "Deploy, monitor, and scale distributed microservices across containerized cloud environments.",
-        "applicant_count": 35,
+        "applicant_count": 15,
         "competition_level": "MEDIUM"
     },
     {

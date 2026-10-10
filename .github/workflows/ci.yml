@@ -1,20 +1,48 @@
-name: CI - Milestone 4 Integration & QA Validation
+name: CI/CD - Milestone 4 Integration, QA & Deployment Gate
 
 on:
   push:
-    branches: [Team-4, main]
+    branches:
+      - main
+      - 'Team-*'
   pull_request:
-    branches: [Team-4, main]
+    branches:
+      - main
+      - 'Team-*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1. Frontend Quality Gate (ESLint, Unit Tests, TypeScript Build)
+  # 1. Lint Gate: Flake8 & ESLint
   # ---------------------------------------------------------------------------
-  frontend-validation:
-    name: Frontend Lint, Test & Production Build
-    runs-on: ubuntu-latest
+  lint:
+    name: Lint & Code Style Gate
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Lint Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+
+      - name: Run Flake8 Code Inspection
+        run: |
+          python integration_omkar/scripts/run_suites.py --suite flake8 --no-docker
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -23,34 +51,57 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend_boomika/package-lock.json
 
-      - name: Install dependencies
+      - name: Run ESLint
+        run: |
+          cd frontend_boomika
+          npm ci
+          npm run lint
+
+  # ---------------------------------------------------------------------------
+  # 2. Frontend Quality Gate: Vitest, ESLint & Production Build
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend Vitest & Production Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend_boomika/package-lock.json
+
+      - name: Install npm dependencies
         run: |
           cd frontend_boomika
           npm ci
 
-      - name: Run ESLint
+      - name: Run Frontend Tests (Vitest)
         run: |
           cd frontend_boomika
-          npm run lint
+          npm run test -- --run
 
-      - name: Run Unit Tests (Vitest)
-        run: |
-          cd frontend_boomika
-          npm run test
-
-      - name: Build Production Frontend
+      - name: Build Production Frontend Artifact
         run: |
           cd frontend_boomika
           npm run build
 
   # ---------------------------------------------------------------------------
-  # 2. Backend & Identity Management Service Tests (Intern 2)
+  # 3. Backend Services & Unit Suites (Isolated Process Matrix)
   # ---------------------------------------------------------------------------
-  backend-service-tests:
-    name: Backend & Identity Tests
-    runs-on: ubuntu-latest
+  backend-unit:
+    name: Unit Test Suite (${{ matrix.suite }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [backend, aiml, m3-schema, m4, integration-unit]
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -58,83 +109,155 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend_mansi/requirements.txt
-
-      - name: Execute Backend Test Suite
-        env:
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend_mansi
-        run: |
-          python -m pytest backend_mansi/tests/ -v --tb=short
-
-  # ---------------------------------------------------------------------------
-  # 3. AI/ML Career Intelligence Service Tests (Intern 4)
-  # ---------------------------------------------------------------------------
-  aiml-service-tests:
-    name: AI/ML & Recommendations Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r aiml_hemalatha/requirements.txt
-          pip install pytest pytest-asyncio httpx
-
-      - name: Execute AIML Test Suite
-        env:
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/aiml_hemalatha:${{ github.workspace }}/integration_omkar/docker/shim
-        run: |
-          python -m pytest aiml_hemalatha/tests/ -v --tb=short
-
-  # ---------------------------------------------------------------------------
-  # 4. Milestone 4 End-to-End Integration, ATS & Analytics Suite
-  # ---------------------------------------------------------------------------
-  m4-integration-tests:
-    name: M4 Integration, Analytics & ATS Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend_mansi/requirements.txt
           pip install -r data_hanith/requirements.txt
+          pip install -r aiml_hemalatha/requirements.txt
           pip install -r integration_omkar/requirements.txt
+          pip install -r integration_omkar/requirements-prod.txt
 
-      - name: Execute Milestone 4 Integration Suite
-        env:
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend_mansi:${{ github.workspace }}/data_hanith:${{ github.workspace }}/aiml_hemalatha:${{ github.workspace }}/integration_omkar/docker/shim
+      - name: Execute Test Suite (${{ matrix.suite }})
         run: |
-          python -m pytest tests/test_m4_day1_foundation.py tests/test_m4_day2_integration.py tests/test_m4_day3_analytics.py tests/test_m4_day4_optimization_and_concurrency.py tests/test_m4_day5_production_finalization.py integration_omkar/tests/unit/ -v --tb=short
+          python integration_omkar/scripts/run_suites.py --suite ${{ matrix.suite }} --no-docker
 
   # ---------------------------------------------------------------------------
-  # 5. Infrastructure, Compose & Deployment Architecture Validation
+  # 4. Infrastructure & Render Configuration Validation
   # ---------------------------------------------------------------------------
-  infrastructure-validation:
-    name: Docker Compose & Render Spec Validation
-    runs-on: ubuntu-latest
+  render-config:
+    name: Render Blueprint & Compose Validation
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      - name: Validate Docker Compose Configuration
-        run: |
-          docker compose -f docker-compose.dev.yml config
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Validate Render Blueprint Specification
+      - name: Validate render.yaml & Compose Config
         run: |
-          python -c "import yaml; yaml.safe_load(open('render.yaml'))"
+          pip install pyyaml
+          python integration_omkar/scripts/run_suites.py --suite render-config --no-docker
+
+      - name: Build Docker Images (Config & Build Dry-Run)
+        run: |
+          docker compose -f docker-compose.dev.yml build
+
+  # ---------------------------------------------------------------------------
+  # 5. Live Stack Integration, E2E, RBAC, Route Contract & Performance
+  # ---------------------------------------------------------------------------
+  integration:
+    name: Live Docker Stack E2E, RBAC & Contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Integration Test Runner Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r integration_omkar/requirements.txt
+          pip install -r integration_omkar/requirements-prod.txt
+
+      - name: Spin Up Docker Dev Stack
+        run: |
+          docker compose -f docker-compose.dev.yml up --build -d --wait
+
+      - name: Await Stack Readiness & Database Verification
+        run: |
+          python integration_omkar/scripts/wait_for_stack.py
+
+      - name: Run Full Live Integration Test Suite
+        run: |
+          python integration_omkar/scripts/run_suites.py --suite integration-live
+
+      - name: Run Security & RBAC Verification
+        run: |
+          python integration_omkar/scripts/run_suites.py --suite security
+
+      - name: Run Latency & Concurrency Performance Benchmark
+        run: |
+          python integration_omkar/scripts/run_suites.py --suite perf
+
+      - name: Run Cold-Start Aware Smoke Test
+        run: |
+          python integration_omkar/scripts/run_suites.py --suite smoke
+
+      - name: Dump Container Logs on Failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.dev.yml logs
+
+      - name: Teardown Docker Stack
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v
+
+  # ---------------------------------------------------------------------------
+  # 6. CI Execution Summary Gate
+  # ---------------------------------------------------------------------------
+  summary:
+    name: CI Pipeline Quality & Gate Summary
+    runs-on: ubuntu-24.04
+    needs: [lint, frontend, backend-unit, render-config, integration]
+    if: always()
+    steps:
+      - name: Evaluate Upstream Job Results
+        run: |
+          echo "=================================================================="
+          echo "                  SWIPEX CI PIPELINE RESULTS                      "
+          echo "=================================================================="
+          echo "Lint Gate:           ${{ needs.lint.result }}"
+          echo "Frontend Gate:       ${{ needs.frontend.result }}"
+          echo "Backend Units Gate:  ${{ needs.backend-unit.result }}"
+          echo "Render Config Gate:  ${{ needs.render-config.result }}"
+          echo "Live Integration:    ${{ needs.integration.result }}"
+          echo "=================================================================="
+
+          if [[ "${{ needs.lint.result }}" != "success" || \
+                "${{ needs.frontend.result }}" != "success" || \
+                "${{ needs.backend-unit.result }}" != "success" || \
+                "${{ needs.render-config.result }}" != "success" || \
+                "${{ needs.integration.result }}" != "success" ]]; then
+            echo "CI GATE FAILED: One or more required upstream jobs did not succeed."
+            exit 1
+          fi
+          echo "ALL CI GATES GREEN: Pipeline passed with zero defects."
+
+  # ---------------------------------------------------------------------------
+  # 7. Render Production Deployment Gate (Main Branch Only)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Render Production Deployment & Verification
+    runs-on: ubuntu-24.04
+    needs: [summary]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Trigger Render Deploy Hooks
+        env:
+          RENDER_DEPLOY_HOOK_GATEWAY: ${{ secrets.RENDER_DEPLOY_HOOK_GATEWAY }}
+          RENDER_DEPLOY_HOOK_JOB: ${{ secrets.RENDER_DEPLOY_HOOK_JOB }}
+          RENDER_DEPLOY_HOOK_RESUME: ${{ secrets.RENDER_DEPLOY_HOOK_RESUME }}
+          RENDER_DEPLOY_HOOK_FRONTEND: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+        run: |
+          python integration_omkar/deploy/trigger_render_deploy.py
+
+      - name: Post-Deployment Production Smoke Test
+        run: |
+          python integration_omkar/scripts/smoke_test.py --base-url "${{ vars.RENDER_BASE_URL || 'https://swipex-auth-gateway.onrender.com' }}" --timeout 180

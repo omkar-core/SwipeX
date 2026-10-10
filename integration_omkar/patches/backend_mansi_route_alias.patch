@@ -1,0 +1,11 @@
+diff --git a/backend_mansi/app/gateway.py b/backend_mansi/app/gateway.py
+index a543ef1..b432190 100644
+--- a/backend_mansi/app/gateway.py
++++ b/backend_mansi/app/gateway.py
+@@ -241,6 +241,7 @@ def get_current_user_optional(
+ 
+ @router.post("/api/v1/resumes/upload")
++@router.post("/api/v1/resume/upload")
+ async def gateway_resume_upload(
+     file: UploadFile = File(...),
+     current_user: dict = Depends(get_current_user_from_gateway)

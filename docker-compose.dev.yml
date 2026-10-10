@@ -34,6 +34,21 @@ services:
     networks:
       - swipex-network
 
+  db-migrate:
+    build:
+      context: .
+      dockerfile: integration_omkar/docker/Dockerfile.migrate
+    container_name: swipex-db-migrate
+    restart: "no"
+    environment:
+      JOB_DATABASE_URL: postgresql://swipex:swipex@postgres:5432/swipex_job
+      AUTH_DATABASE_URL: postgresql://swipex:swipex@postgres:5432/swipex_auth
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - swipex-network
+
   job-data-service:
     build:
       context: .
@@ -55,6 +70,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     networks:
       - swipex-network
 
@@ -81,7 +98,7 @@ services:
 
   minio:
     profiles: ["storage"]
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2024-11-07T00-52-49Z
     container_name: swipex-minio
     restart: unless-stopped
     ports:
@@ -142,6 +159,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       job-data-service:
         condition: service_started
       resume-service:

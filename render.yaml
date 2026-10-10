@@ -1,0 +1,113 @@
+# SwipeX Milestone 4 — Render Infrastructure as Code (Blueprint)
+# Specification: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: swipex-postgres
+    databaseName: swipex_auth
+    user: swipex
+    plan: free
+    region: oregon
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Frontend Web Client (Static Site on Global CDN)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: swipex-frontend
+    runtime: static
+    plan: free
+    region: oregon
+    rootDir: frontend_boomika
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    envVars:
+      - key: VITE_BASE_API_URL
+        value: https://swipex-auth-gateway.onrender.com/api/v1
+      - key: VITE_WS_URL
+        value: wss://swipex-auth-gateway.onrender.com/api/v1/notifications/ws
+      - key: VITE_USE_MOCK
+        value: "false"
+
+  # ---------------------------------------------------------------------------
+  # 2. Auth Service & API Gateway (Web Service with WebSocket support)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: swipex-auth-gateway
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend_mansi
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: swipex-postgres
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SESSION_SECRET_KEY
+        generateValue: true
+      - key: GATEWAY_SHARED_SECRET
+        generateValue: true
+      - key: JOB_SERVICE_URL
+        value: https://swipex-job-service.onrender.com
+      - key: RESUME_SERVICE_URL
+        value: https://swipex-resume-service.onrender.com
+      - key: MATCHING_ENGINE_URL
+        value: https://swipex-resume-service.onrender.com
+      - key: CORS_ORIGINS
+        value: https://swipex-frontend.onrender.com
+
+  # ---------------------------------------------------------------------------
+  # 3. Job & Data Intelligence Service (Web Service)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: swipex-job-service
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: data_hanith
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: swipex-postgres
+          property: connectionString
+      - key: GATEWAY_SHARED_SECRET
+        fromService:
+          type: web
+          name: swipex-auth-gateway
+          envVarKey: GATEWAY_SHARED_SECRET
+      - key: TRUST_GATEWAY_HEADERS
+        value: "true"
+
+  # ---------------------------------------------------------------------------
+  # 4. Resume & AI Career Intelligence Service (Web Service)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: swipex-resume-service
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: aiml_hemalatha
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: JOB_SERVICE_URL
+        value: https://swipex-job-service.onrender.com

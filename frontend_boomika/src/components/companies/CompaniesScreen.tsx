@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Building2, Sparkles, MapPin, Users, Star, ArrowRight, Briefcase, ExternalLink, Filter, Search, Loader2 } from 'lucide-react';
 import { Company, CompanyDetail, Job } from '../../types';
 import { ApiService } from '../../services/api';
@@ -15,11 +15,7 @@ export const CompaniesScreen: React.FC = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
-  useEffect(() => {
-    fetchCompanies();
-  }, [activeFilter]);
-
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     setLoading(true);
     try {
       const data = await ApiService.getCompanies({
@@ -31,7 +27,11 @@ export const CompaniesScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeFilter, showToast]);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
 
   const handleSelectCompany = async (companyId: string) => {
     setLoadingDetail(true);

@@ -6,7 +6,7 @@ Applicant Counter Increments, Competition Level Re-evaluation, and Early Applica
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, Union
 
 from config import get_reference_time
 from db.connection import get_dict_cursor

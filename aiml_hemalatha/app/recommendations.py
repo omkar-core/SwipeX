@@ -62,17 +62,15 @@ def get_recommendations(
         # ==========================================
 
         job_title = str(
-            job.get(
-                "job_title",
-                "Unknown Role"
-            )
+            job.get("job_title")
+            or job.get("Job Title")
+            or "Unknown Role"
         )
 
         location = str(
-            job.get(
-                "location",
-                "Remote"
-            )
+            job.get("location")
+            or job.get("Location")
+            or "Remote"
         )
 
         required_skills = job.get(

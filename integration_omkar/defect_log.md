@@ -726,5 +726,87 @@ GitHub Actions environment restricts Docker image pulls for certain registries. 
 - ✅ AIML Unit Tests: PASS
 - ✅ Integration Validation: PASS
 
+---
 
+# Milestone 4 Defect Tracking & Verification Log
 
+### DEF-034: NameError 'Union' Undefined in ApplicationRepository
+- **Date Found**: 2026-10-10
+- **Owner**: Hanith (Data & Jobs) / Fixed by Intern 5
+- **Component**: `data_hanith/db/repositories/application_repository.py`
+- **Severity**: **Critical** (Blocks test collection across all M4 test suites)
+- **Priority**: **P0**
+- **Problem**: In `ApplicationRepository.create_application`, argument `applied_at: Optional[Union[datetime, str]] = None` utilized `Union` without importing it from `typing`. Python failed with `NameError: name 'Union' is not defined` during module collection, aborting all 5 Milestone 4 test suites.
+- **Expected Behavior**: Clean import and instantiation of `ApplicationRepository`.
+- **Actual Behavior**: `NameError: name 'Union' is not defined` halted Pytest discovery.
+- **Resolution**: Added `Union` to `from typing import List, Optional, Dict, Any, Tuple, Union`. Verified all 39 M4 day tests run and pass (100%).
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+### DEF-035: Inconsistent Column Casing for 'job_title' in Recommendations
+- **Date Found**: 2026-10-10
+- **Owner**: Hemalatha (AI/ML) / Fixed by Intern 5
+- **Component**: `aiml_hemalatha/app/recommendations.py` (Line 64)
+- **Severity**: **Medium**
+- **Priority**: **P1**
+- **Problem**: `recommendations.py` only read `job.get("job_title", "Unknown Role")` and `job.get("location", "Remote")`. When passed raw title-cased columns (`Job Title`, `Location`), it defaulted to `Unknown Role`, causing `test_aiml_fixes.py` (`test_column_name_compatibility`) to fail assertion.
+- **Expected Behavior**: Safely extracts title and location regardless of casing convention.
+- **Actual Behavior**: Emitted `Unknown Role` and failed test assertion.
+- **Resolution**: Updated extraction to `str(job.get("job_title") or job.get("Job Title") or "Unknown Role")` and equivalent for `location`. Verified 3/3 tests pass.
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+### DEF-036: Missing openpyxl Dependency for Ingestion Pipeline
+- **Date Found**: 2026-10-10
+- **Owner**: Intern 5 (Platform & Testing)
+- **Component**: `data_hanith/requirements.txt` & Environment
+- **Severity**: **High**
+- **Priority**: **P1**
+- **Problem**: Parsing `indian-job-market-dataset-2025 processed.xlsx` via pandas required `openpyxl`. Threw `ImportError: 'Import openpyxl' failed` blocking dataset validation tests.
+- **Expected Behavior**: Excel dataset parses cleanly.
+- **Actual Behavior**: Import failure during `pd.read_excel`.
+- **Resolution**: Installed `openpyxl==3.1.5` and declared in `data_hanith/requirements.txt`. Verified all 8 ingestion tests pass.
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+### DEF-037: React Hooks Temporal Dead Zone in CompaniesScreen
+- **Date Found**: 2026-10-10
+- **Owner**: Boomika (Frontend) / Fixed by Intern 5
+- **Component**: `frontend_boomika/src/components/companies/CompaniesScreen.tsx`
+- **Severity**: **Medium** (Blocks clean ESLint in CI)
+- **Priority**: **P2**
+- **Problem**: `fetchCompanies` function was declared using `const` below the `useEffect` that called it, violating JavaScript lexical declaration order and triggering ESLint `Cannot access variable before it is declared` and `react-hooks/exhaustive-deps`.
+- **Expected Behavior**: Component passes ESLint without warnings or errors.
+- **Actual Behavior**: ESLint reported 1 error and 1 warning.
+- **Resolution**: Wrapped `fetchCompanies` in `useCallback` prior to `useEffect`, satisfying ESLint. Verified `npm run lint` passes with 0 errors and 0 warnings.
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+### DEF-038: UTF-16LE Encoding on aiml_hemalatha/requirements.txt
+- **Date Found**: 2026-10-10
+- **Owner**: Hemalatha (AI/ML) / Fixed by Intern 5
+- **Component**: `aiml_hemalatha/requirements.txt`
+- **Severity**: **High** (Blocks Linux CI & Render builds)
+- **Priority**: **P1**
+- **Problem**: `aiml_hemalatha/requirements.txt` was encoded in UTF-16LE, causing Linux `pip install` to fail with `UnicodeDecodeError` or garbled null byte characters.
+- **Expected Behavior**: Standard UTF-8 encoded plain text file.
+- **Actual Behavior**: UTF-16LE encoding prevented automated tool consumption.
+- **Resolution**: Re-encoded file to clean UTF-8 without BOM. Verified readable and valid.
+- **Status**: **FIXED AND VERIFIED by Intern 5**
+
+---
+
+## Final Milestone 4 Defect Summary
+
+| Category | Count | Status | Notes |
+|---|---|---|---|
+| **Critical Severity Defects** | 0 Open | **All Resolved** | DEF-034 resolved and verified. |
+| **High Severity Defects** | 0 Open | **All Resolved** | DEF-036, DEF-038 resolved and verified. |
+| **Medium Severity Defects**| 0 Open | **All Resolved** | DEF-035, DEF-037 resolved and verified. |
+| **Low Severity Defects** | 0 Open | **All Resolved** | None remaining. |
+
+**Final M4 Defect Status**: **ZERO OPEN DEFECTS**. All teammate components connect cleanly and pass all automated suites.

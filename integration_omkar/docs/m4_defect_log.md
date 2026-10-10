@@ -62,3 +62,19 @@
 - **Observed Behavior:** Test `test_m2_high_competition_applicant_count_gt_50` asserted `applicant_count > 50` for `HIGH` competition jobs. Job 1 had applicant count 45.
 - **Root Cause:** Seed applicant count was 45 (which fell into MEDIUM or border classification depending on date formula).
 - **Resolution:** Adjusted Job 1 applicant count to 55 and Job 5 to 15 in `seed_all.py`, ensuring mathematical clarity and consistency across competition levels.
+
+### DEF-017: Missing Authorization Header Status Code Drift (401 vs 403)
+- **Severity:** High (P1)
+- **Component:** `backend_mansi/tests/test_auth.py`
+- **Observed Behavior:** `test_me_requires_valid_token` failed with `assert 401 == 403` in CI environments.
+- **Root Cause:** In newer versions of FastAPI/Starlette (specifically Starlette >= 0.39 / 1.0+ introduced transitively by unpinned AI/ML dependencies), HTTPBearer middleware returns HTTP 401 Unauthorized for missing headers instead of HTTP 403 Forbidden. The test hard-coded `assert r.status_code == 403`.
+- **Resolution:**
+  1. Integrator: Enforced strict dependency constraints (`fastapi==0.115.0`, `starlette==0.38.6`, `pydantic==2.9.2`) via `integration_omkar/ci/constraints.txt` and unified installer `install_ci_deps.sh`.
+  2. Owner Defect Handed to Mansi: Created patch `integration_omkar/patches/mansi_auth_test_status.patch` proposing `assert r.status_code in (401, 403)` so the test remains robust across future framework updates without relying on brittle exact status code semantics.
+
+### DEF-018: SQLite Database Absent in Clean CI Environment (No Such Table: Jobs)
+- **Severity:** High (P1)
+- **Component:** `tests/test_m3_day2..6*.py`, `data_hanith`
+- **Observed Behavior:** CI `m3-schema` test suite failed with 38 errors `sqlite3.OperationalError: no such table: jobs`.
+- **Root Cause:** The tests default to SQLite database at `data/swipex_job.db` when `DATABASE_URL` is unset. SQLite `.db` files are rightly gitignored and not committed. On clean CI runners, the database file did not exist, so table queries threw SQLite OperationalError.
+- **Resolution:** Implemented `integration_omkar/scripts/bootstrap_test_db.py`, which is called automatically prior to running `m3-schema` and `m4` test suites. It executes Hanith's canonical `schema.sql`, applies `apply_m4_migration.py` (unmodified), and ensures baseline test job seeds exist. Database is created deterministically on the fly in transient CI storage without committing `.db` binaries to Git.

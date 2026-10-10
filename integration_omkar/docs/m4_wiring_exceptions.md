@@ -97,4 +97,46 @@ Per Section 1 of the Milestone 4 Specification, any edits to teammate directorie
 +        except Exception:
 +            pass
 ```
+---
 
+## Wiring Exception 5: Alignment of AIML Service FastAPI/Starlette Dependencies
+- **File:** `aiml_hemalatha/requirements.txt`
+- **Owner:** Intern 4 (AI/ML & Career Intelligence)
+- **Change Size:** 8 dependency versions aligned to backend pins
+- **Rationale:** Unaligned transitive dependencies in `aiml_hemalatha/requirements.txt` (`fastapi==0.141.1`, `starlette==1.6.0`, `pydantic==2.13.4`) caused Starlette 1.6 HTTPBearer to return 401 instead of 403 on missing authorization headers in shared environments, breaking `test_me_requires_valid_token` in CI. Aligned to match backend known-good versions (`fastapi==0.115.0`, `starlette==0.38.6`, `pydantic==2.9.2`, `pydantic_core==2.23.4`, `uvicorn==0.30.6`, `anyio==4.15.0`).
+
+### Diff:
+```diff
+--- a/aiml_hemalatha/requirements.txt
++++ b/aiml_hemalatha/requirements.txt
+@@ -10,7 +10,7 @@
+-fastapi==0.141.1
++fastapi==0.115.0
+-pydantic==2.13.4
+-pydantic_core==2.46.4
++pydantic==2.9.2
++pydantic_core==2.23.4
+-starlette==1.6.0
++starlette==0.38.6
+-uvicorn==0.52.4
++uvicorn==0.30.6
+```
+
+---
+
+## Wiring Exception 6: Data Service Bcrypt & Pandas Dependency Pins
+- **File:** `data_hanith/requirements.txt`
+- **Owner:** Intern 3 (Data Pipeline & Storage)
+- **Change Size:** 2 dependency versions pinned
+- **Rationale:** Pinned `bcrypt==4.0.1` and `pandas>=2.2.0` to resolve passlib bcrypt compatibility across Linux and Windows environments and match unified Docker container constraints.
+
+### Diff:
+```diff
+--- a/data_hanith/requirements.txt
++++ b/data_hanith/requirements.txt
+@@ -11,4 +11,4 @@
+-bcrypt<4.0.0
++bcrypt==4.0.1
+-pandas==2.2.3
++pandas>=2.2.0
+```

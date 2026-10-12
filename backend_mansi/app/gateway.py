@@ -311,5 +311,4 @@ async def gateway_ats_score(
     current_user: User = Depends(get_current_user),
 ):
     """Body: { resume_id, job_id } -> { match_score, missing_keywords[], missing_skills[], suggestions[] }"""
-    body_override = payload.model_dump_json().encode() if payload else None
-    return await _proxy(request, _resume_service_url(), "/api/v1/ats/score", body_override=body_override, current_user=current_user)
+    return await _proxy(request, _resume_service_url(), "/api/v1/ats/score", current_user=current_user)

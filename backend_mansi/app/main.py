@@ -6,8 +6,9 @@ Run with:  uvicorn app.main:app --reload --port 8001
 from pathlib import Path
 from dotenv import load_dotenv
 _env_path = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(_env_path, override=True)
-load_dotenv(override=True)
+if _env_path.exists():
+    load_dotenv(_env_path)
+load_dotenv()
 import os
 import time
 from datetime import datetime
@@ -170,6 +171,8 @@ def _issue_token_pair(user: User, db: Session) -> schemas.TokenResponse:
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/auth/oauth/google")
 async def oauth_google_login(request: Request):
+    if _env_path.exists():
+        load_dotenv(_env_path, override=True)
     oauth.google.client_id = os.getenv("GOOGLE_CLIENT_ID")
     oauth.google.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = request.url_for("oauth_google_callback")
@@ -178,6 +181,8 @@ async def oauth_google_login(request: Request):
 
 @app.get("/api/v1/auth/oauth/google/callback")
 async def oauth_google_callback(request: Request, db: Session = Depends(get_db)):
+    if _env_path.exists():
+        load_dotenv(_env_path, override=True)
     oauth.google.client_id = os.getenv("GOOGLE_CLIENT_ID")
     oauth.google.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     token = await oauth.google.authorize_access_token(request)

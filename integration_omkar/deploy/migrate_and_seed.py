@@ -54,13 +54,25 @@ def wait_for_db(db_url: str, max_retries: int = 30, retry_delay: float = 1.0) ->
 
 def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
     # Determine Job Service DB URL
-    target_job_url = normalize_db_url(
-        job_db_url or os.environ.get("JOB_DATABASE_URL") or os.environ.get("DATABASE_URL") or "postgresql://swipex:swipex@postgres:5432/swipex_job"
-    )
+    # NOTE: No hardcoded hostname fallback — Render injects DATABASE_URL / JOB_DATABASE_URL
+    #       at runtime. Missing env vars produce a clear error instead of a cryptic
+    #       connection timeout to a non-existent 'postgres:5432' Docker-compose host.
+    raw_job_url = job_db_url or os.environ.get("JOB_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if not raw_job_url:
+        logger.error(
+            "No database URL configured. Set DATABASE_URL or JOB_DATABASE_URL environment variable."
+        )
+        sys.exit(1)
+    target_job_url = normalize_db_url(raw_job_url)
+
     # Determine Auth Service DB URL
-    target_auth_url = normalize_db_url(
-        auth_db_url or os.environ.get("AUTH_DATABASE_URL") or os.environ.get("DATABASE_URL") or "postgresql://swipex:swipex@postgres:5432/swipex_auth"
-    )
+    raw_auth_url = auth_db_url or os.environ.get("AUTH_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if not raw_auth_url:
+        logger.error(
+            "No auth database URL configured. Set DATABASE_URL or AUTH_DATABASE_URL environment variable."
+        )
+        sys.exit(1)
+    target_auth_url = normalize_db_url(raw_auth_url)
 
     logger.info(f"[1/4] Connecting to Job Database: {target_job_url}")
     if not wait_for_db(target_job_url):

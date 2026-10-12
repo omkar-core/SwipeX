@@ -1,5 +1,9 @@
 import os
 import uuid
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
@@ -141,6 +145,23 @@ def list_resumes():
             }
             for resume_id, resume in RESUME_STORE.items()
         ]
+    }
+
+
+@app.get("/api/v1/resumes/{resume_id}")
+def get_resume_by_id(resume_id: str):
+    if resume_id not in RESUME_STORE:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Resume '{resume_id}' not found. Please upload a resume first via POST /api/v1/resumes/upload."
+        )
+    resume = RESUME_STORE[resume_id]
+    return {
+        "resume_id": resume_id,
+        "filename": resume["filename"],
+        "parsed_skills": resume.get("parsed_skills", []),
+        "raw_text_preview": resume.get("raw_text_preview", ""),
+        "status": "active"
     }
 
 

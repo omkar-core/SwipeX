@@ -43,6 +43,21 @@ class MeResponse(BaseModel):
     role: Role
 
 
+class SwipeRequest(BaseModel):
+    job_id: str
+    direction: str = "right"
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "job_id": "47b08275-6087-4604-a2a1-3178ee0cb60b",
+                "direction": "right"
+            }
+        }
+    }
+
+
+
 # ---------------------------------------------------------------------------
 # Notification Schemas (Milestone 4)
 # ---------------------------------------------------------------------------
@@ -149,6 +164,11 @@ class ApplicationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ATSScoreGatewayRequest(BaseModel):
+    resume_id: str
+    job_id: str
 
 
 # ---------------------------------------------------------------------------

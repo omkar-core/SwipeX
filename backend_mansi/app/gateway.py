@@ -32,10 +32,11 @@ import os
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, File, UploadFile, Body
 
 from app.deps import get_current_user, get_optional_current_user, require_role
 from app.models import User
+from app import schemas
 
 router = APIRouter()
 
@@ -51,9 +52,8 @@ def _resume_service_url() -> str:
 
 
 def _matching_engine_url() -> str:
-    """Intern 4's Matching Engine — registered Day 4 of Milestone 2,
-    ahead of their service actually landing (same pattern as Resume in M1)."""
-    return os.getenv("MATCHING_ENGINE_URL", "http://localhost:8004")
+    """Intern 4's Matching Engine & Career Intelligence Service (aiml_hemalatha on port 8003)."""
+    return os.getenv("MATCHING_ENGINE_URL", "http://localhost:8003")
 
 
 async def _proxy(
@@ -62,23 +62,23 @@ async def _proxy(
     path: str,
     body_override: Optional[bytes] = None,
     current_user: Optional[User] = None,
+    files_override: Optional[dict] = None,
 ) -> Response:
     """
     Forwards the incoming request to the target service and relays its response.
-
-    body_override: used when the Gateway rewrites the payload before
-    forwarding (see swipe direction normalisation below).
-    current_user: when given, injects X-User-Id / X-User-Role / X-Gateway-Secret
-    identity headers, which data_hanith's dependencies.py reads for trusted
-    internal calls. The secret has a fallback default matching their own
-    documented default, so this works out of the box even before either
-    .env is customised.
     """
     url = f"{base_url}{path}"
-    headers = {
-        k: v for k, v in request.headers.items()
-        if k.lower() not in ("host", "content-length")
-    }
+    
+    if files_override:
+        headers = {
+            k: v for k, v in request.headers.items()
+            if k.lower() not in ("host", "content-length", "content-type")
+        }
+    else:
+        headers = {
+            k: v for k, v in request.headers.items()
+            if k.lower() not in ("host", "content-length")
+        }
 
     if current_user is not None:
         headers["X-User-Id"] = str(current_user.id)
@@ -87,7 +87,15 @@ async def _proxy(
             "GATEWAY_SHARED_SECRET", "swipex-internal-gateway-secret"
         )
 
-    content = body_override if body_override is not None else await request.body()
+    content = None
+    if not files_override:
+        if body_override is not None:
+            content = body_override
+        else:
+            try:
+                content = await request.body()
+            except RuntimeError:
+                content = b""
 
     async with httpx.AsyncClient() as client:
         try:
@@ -97,6 +105,7 @@ async def _proxy(
                 params=request.query_params,
                 headers=headers,
                 content=content,
+                files=files_override,
                 timeout=30.0,
             )
         except httpx.ConnectError:
@@ -148,6 +157,7 @@ async def gateway_job_detail(job_id: str, request: Request, current_user: User =
 @router.post("/api/v1/swipes")
 async def gateway_create_swipe(
     request: Request,
+    payload: Optional[schemas.SwipeRequest] = Body(None),
     current_user: User = Depends(require_role("job_seeker")),
 ):
     """
@@ -242,9 +252,23 @@ async def gateway_recommendations(request: Request, current_user: User = Depends
 @router.post("/api/v1/resume/upload")
 async def gateway_resume_upload(
     request: Request,
+    file: Optional[UploadFile] = File(None, description="PDF, DOC, or DOCX resume file to upload"),
     current_user: User = Depends(require_role("job_seeker")),
 ):
-    return await _proxy(request, _resume_service_url(), "/api/v1/resumes/upload", current_user=current_user)
+    files_override = None
+    if file is not None:
+        file_bytes = await file.read()
+        filename = file.filename or "resume.pdf"
+        content_type = file.content_type or "application/pdf"
+        files_override = {"file": (filename, file_bytes, content_type)}
+
+    return await _proxy(
+        request,
+        _resume_service_url(),
+        "/api/v1/resumes/upload",
+        current_user=current_user,
+        files_override=files_override,
+    )
 
 
 @router.get("/api/v1/resumes")
@@ -283,7 +307,9 @@ async def gateway_resume_parse(
 @router.post("/api/v1/ats/score")
 async def gateway_ats_score(
     request: Request,
+    payload: Optional[schemas.ATSScoreGatewayRequest] = Body(None),
     current_user: User = Depends(get_current_user),
 ):
     """Body: { resume_id, job_id } -> { match_score, missing_keywords[], missing_skills[], suggestions[] }"""
-    return await _proxy(request, _resume_service_url(), "/api/v1/ats/score", current_user=current_user)
+    body_override = payload.model_dump_json().encode() if payload else None
+    return await _proxy(request, _resume_service_url(), "/api/v1/ats/score", body_override=body_override, current_user=current_user)

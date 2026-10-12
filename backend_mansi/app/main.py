@@ -3,8 +3,11 @@ Auth & Identity service — Milestone 4: Notifications, Analytics & Application 
 
 Run with:  uvicorn app.main:app --reload --port 8001
 """
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path, override=True)
+load_dotenv(override=True)
 import os
 import time
 from datetime import datetime
@@ -167,12 +170,16 @@ def _issue_token_pair(user: User, db: Session) -> schemas.TokenResponse:
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/auth/oauth/google")
 async def oauth_google_login(request: Request):
+    oauth.google.client_id = os.getenv("GOOGLE_CLIENT_ID")
+    oauth.google.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = request.url_for("oauth_google_callback")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
 @app.get("/api/v1/auth/oauth/google/callback")
 async def oauth_google_callback(request: Request, db: Session = Depends(get_db)):
+    oauth.google.client_id = os.getenv("GOOGLE_CLIENT_ID")
+    oauth.google.client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     token = await oauth.google.authorize_access_token(request)
     userinfo = token.get("userinfo") or {}
     google_id = userinfo.get("sub")

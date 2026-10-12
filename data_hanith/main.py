@@ -2,6 +2,11 @@
 Main Application Entry Point for SwipeX Job & Data Intelligence Service.
 FastAPI ASGI application exposing job listings, details, and search endpoints.
 """
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import jobs, swipes, companies

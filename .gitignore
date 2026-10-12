@@ -9,7 +9,6 @@ node_modules/
 .v/
 venv311/
 integration_omkar/.venv/
-
 # Secrets, certificates, databases & sensitive env configs (M4 Security Gate)
 .env.*
 !.env.example
@@ -18,3 +17,4 @@ integration_omkar/.venv/
 *serviceAccount*.json
 *.sqlite*
 dist/
+AI-Powered-Swipe-Based-Job-Discovery-and-Personalized-Career-Intelligence-Platform/

@@ -43,6 +43,10 @@ def create_access_token(user_id: str, role: str) -> str:
 
 def decode_access_token(token: str) -> dict:
     """Raises jose.JWTError if invalid/expired — caller should catch and 401."""
+    if token:
+        token = token.strip()
+        if token.lower().startswith("bearer "):
+            token = token[7:].strip()
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 

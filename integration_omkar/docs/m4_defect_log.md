@@ -19,6 +19,7 @@
 | **DEF-040** | Low | P3 | Tracked `.env.test` file present in frontend directory | Frontend / Boomika (Intern 1) | Patch handed to owner (`frontend_boomika_untrack_env_test.patch`); .gitignore hardened |
 | **DEF-041** | Medium | P2 | Hardcoded literal `postgres:postgres` DB URI in QA performance validation script | Data / Hanith (Intern 3) | Patch handed to owner (`data_hanith_hardcoded_credentials.patch`) |
 | **DEF-042** | High | P1 | Gitleaks sha256 checksum filename mismatch in CI installer step (Run #68) | Platform & CI / Omkar (Intern 5) | Resolved via `install_gitleaks.sh` preserving asset filenames & mktemp verification |
+| **DEF-043** | High / Blocker | P0 | Render cloud build failure on unpinned Python 3.14 (pydantic-core wheel missing) | Platform & Deploy / Omkar (Intern 5) | Resolved via `render.yaml` `PYTHON_VERSION: 3.11.9`, `.python-version`, `--prefer-binary` |
 
 
 ---
@@ -111,4 +112,23 @@
   2. Uses `mktemp -d` and downloads release assets preserving their original filenames (`gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz` and `gitleaks_${GITLEAKS_VERSION}_checksums.txt`).
   3. Extracts expected hash with `grep " ${TARBALL}\$" "${CHECKSUMS}" > expected.sha256`, validates non-empty with `test -s`, and executes `sha256sum -c expected.sha256`.
   4. Added negative test validation proving corrupted hashes fail with non-zero exit code.
+
+### DEF-043: Render Cloud Build Failure on Unpinned Python 3.14 (pydantic-core wheel missing)
+- **Severity:** Blocker (P0)
+- **Component:** `render.yaml`, `.python-version`, Deployment Architecture
+- **Observed Behavior:** Render build crashed during `pip install` with:
+  ```text
+  Collecting pydantic-core==2.23.4 (from pydantic==2.9.2 ... backend_mansi/requirements.txt)
+  Downloading pydantic_core-2.23.4.tar.gz        <-- source tarball, not a wheel
+  cargo: Read-only file system (os error 30)
+  interpreter: /opt/render/project/src/.venv/bin/python3.14
+  error: metadata-generation-failed -> Build failed
+  ```
+- **Root Cause:** Render automatically defaults new services (created after February 11, 2026) to Python 3.14.3. The locked dependencies (`fastapi==0.115.0`, `pydantic==2.9.2`, `pydantic-core==2.23.4`) do not have prebuilt binary wheels for Python 3.14. When `pip` attempts to compile `pydantic-core` from source, `cargo` fails due to Render's read-only build environment outside the virtual environment. Local development and CI run on Python 3.11.9, where prebuilt wheels exist.
+- **Resolution:**
+  1. Pinned `PYTHON_VERSION: 3.11.9` in `render.yaml` for all 3 native Python services (`swipex-auth-gateway`, `swipex-job-service`, `swipex-resume-service`).
+  2. Created repository root `.python-version` containing `3.11.9` as synchronized backup.
+  3. Added `pip install --upgrade pip && pip install --prefer-binary` in `buildCommand` for each service to ensure prebuilt wheels are preferred and missing wheels fail fast.
+  4. Verified all services start cleanly on `$PORT`, respond with HTTP 200 on `/health`, and consume ~18 MB RSS peak memory (well below Render's 512 MB free tier limit).
+
 

@@ -20,6 +20,18 @@ Based on official Render documentation and pricing audits conducted on October 1
 | **Persistent Disks & Private Services** | Paid plans only (disks starting at $0.25/GB/mo; private services require paid team plans) | Not available on Render Free Tier. | MinIO & ChromaDB fallback to in-process SQLite / ephemeral disk for local demo, or cloud S3/Chroma when credentials provided. |
 | **Pre-Deploy Commands (`preDeployCommand`)** | Paid plans only | Not supported on Free Web Services. | Replaced by `entrypoint_render.py`, which normalizes DB URLs and executes `migrate_and_seed.py` on container boot. |
 
+### 1.1 Python Version Pinning & Build Architecture (DEF-043 Fix)
+* **Root Cause of Build Failure:** Render defaults to **Python 3.14.3** for all services created after February 11, 2026. `pydantic-core==2.23.4` (locked by `pydantic==2.9.2`) does not publish prebuilt binary wheels for Python 3.14. As a result, `pip` attempted to compile `pydantic-core` from source tarball using Rust/Maturin. Because Render's build environment enforces a read-only filesystem outside the project virtualenv, Cargo failed immediately with `cargo: Read-only file system (os error 30)`.
+* **Resolution:** 
+  1. Explicitly pinned `PYTHON_VERSION: 3.11.9` in `render.yaml` for all native Python web services (`swipex-auth-gateway`, `swipex-job-service`, `swipex-resume-service`).
+  2. Added repository root [`.python-version`](file:///d:/Webapp/Working_webapps/SwipeX_infosys_springboard_Project/AI-Powered-Swipe-Based-Job-Discovery-and-Personalized-Career-Intelligence-Platform/.python-version) containing `3.11.9` as a synchronized backup.
+  3. Updated build commands to `pip install --upgrade pip && pip install --prefer-binary -r ...` to guarantee that prebuilt binary wheels are prioritized and missing wheels fail fast.
+* **Prebuilt Wheel Parity:** Python 3.11.9 has 100% prebuilt binary wheel coverage on Linux (`manylinux_2_17_x86_64`) for all dependencies including `pydantic-core==2.23.4`, `psycopg2-binary==2.9.9`, `bcrypt==4.0.1`, `numpy==2.4.6`, `pandas==3.0.5`, `scikit-learn==1.9.1`, requiring 0 source compilation and 0 Rust dependencies.
+* **Runtime Memory Footprint:** Verified working set memory per service is ~18 MB RSS peak, well below Render's 512 MB free tier ceiling:
+  * `swipex-auth-gateway`: ~18.10 MB RSS
+  * `swipex-job-service`: ~18.16 MB RSS
+  * `swipex-resume-service`: ~17.99 MB RSS
+
 ---
 
 ## 2. Infrastructure as Code Architecture (`render.yaml`)

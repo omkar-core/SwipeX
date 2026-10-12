@@ -56,10 +56,12 @@ services:
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install -r backend_mansi/requirements.txt -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
+    buildCommand: pip install --upgrade pip && pip install --prefer-binary -r backend_mansi/requirements.txt -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
     startCommand: python integration_omkar/deploy/entrypoint_render.py --app backend_mansi.app.main:app
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DATABASE_URL
         fromDatabase:
           name: swipex-postgres
@@ -94,10 +96,12 @@ services:
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
+    buildCommand: pip install --upgrade pip && pip install --prefer-binary -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
     startCommand: python integration_omkar/deploy/entrypoint_render.py --app data_hanith.main:app
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DATABASE_URL
         fromDatabase:
           name: swipex-postgres
@@ -118,9 +122,11 @@ services:
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install -r aiml_hemalatha/requirements.txt -r integration_omkar/requirements-prod.txt
+    buildCommand: pip install --upgrade pip && pip install --prefer-binary -r aiml_hemalatha/requirements.txt -r integration_omkar/requirements-prod.txt
     startCommand: python integration_omkar/deploy/entrypoint_render.py --app aiml_hemalatha.app.main:app
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: JOB_SERVICE_URL
         value: https://swipex-job-service.onrender.com

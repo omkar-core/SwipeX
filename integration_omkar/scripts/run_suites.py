@@ -303,17 +303,16 @@ def run_suite_frontend() -> SuiteResult:
     return combined
 
 def run_suite_render_config() -> SuiteResult:
-    render_yaml_path = os.path.join(BASE_DIR, "render.yaml")
-    cmd_yaml = [sys.executable, "-c", f"import yaml; yaml.safe_load(open(r'{render_yaml_path}'))"]
-    yaml_res = run_cmd(cmd_yaml, cwd=BASE_DIR, env=os.environ.copy(), suite_name="render-yaml")
+    preflight_script = os.path.join(BASE_DIR, "integration_omkar", "scripts", "render_preflight.py")
+    preflight_res = run_cmd([sys.executable, preflight_script], cwd=BASE_DIR, env=os.environ.copy(), suite_name="render-preflight")
 
     docker_cmd = "docker"
     compose_res = run_cmd([docker_cmd, "compose", "-f", "docker-compose.dev.yml", "config"], cwd=BASE_DIR, env=os.environ.copy(), suite_name="compose-config")
 
     combined = SuiteResult("render-config")
-    combined.passed = 1 if (yaml_res.exit_code == 0 and compose_res.exit_code == 0) else 0
-    combined.failed = 1 if (yaml_res.exit_code != 0 or compose_res.exit_code != 0) else 0
-    combined.duration = yaml_res.duration + compose_res.duration
+    combined.passed = 1 if (preflight_res.exit_code == 0 and compose_res.exit_code == 0) else 0
+    combined.failed = 1 if (preflight_res.exit_code != 0 or compose_res.exit_code != 0) else 0
+    combined.duration = preflight_res.duration + compose_res.duration
     combined.exit_code = 0 if combined.failed == 0 else 1
     return combined
 

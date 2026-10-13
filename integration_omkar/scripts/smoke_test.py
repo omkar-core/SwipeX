@@ -190,28 +190,30 @@ def main():
         print_rollback_hint()
         sys.exit(1)
 
-    # 2. Database Schema + Proxy Routing Verification
+    # 2. Warm Up Upstream Microservices Before Proxy Verification
+    # Render Free Tier services sleep after 15 min; warming them directly prevents
+    # upstream cold-start timeouts when the gateway attempts to proxy requests.
+    if args.job_url:
+        print(f"[SMOKE] Pre-warming upstream Job Service at {args.job_url}...")
+        job_warm, _ = poll_health(args.job_url, timeout=120, poll_interval=5)
+        if not job_warm:
+            print("[SMOKE] [WARN] Job Service did not warm within 120s; proxy requests may be slow.")
+
+    if args.resume_url:
+        print(f"[SMOKE] Pre-warming upstream Resume Service at {args.resume_url}...")
+        res_warm, _ = poll_health(args.resume_url, timeout=120, poll_interval=5)
+        if not res_warm:
+            print("[SMOKE] [WARN] Resume Service did not warm within 120s; proxy requests may be slow.")
+
+    if args.frontend_url:
+        verify_endpoint(f"{args.frontend_url.rstrip('/')}/")
+
+    # 3. Database Schema + Proxy Routing Verification
     jobs_ok, _ = verify_endpoint(f"{base_url}/api/v1/jobs", expected_key="jobs")
     if not jobs_ok:
         print("\n[SMOKE] [RESULT] Database or jobs routing check failed.")
         print_rollback_hint()
         sys.exit(1)
-
-    # 3. Optional Services Health Checks
-    if args.job_url:
-        job_ok, _ = verify_endpoint(f"{args.job_url.rstrip('/')}/health")
-        if not job_ok:
-            print("[SMOKE] [WARN] Job service health check failed.")
-
-    if args.resume_url:
-        res_ok, _ = verify_endpoint(f"{args.resume_url.rstrip('/')}/health")
-        if not res_ok:
-            print("[SMOKE] [WARN] Resume service health check failed.")
-
-    if args.frontend_url:
-        front_ok, _ = verify_endpoint(f"{args.frontend_url.rstrip('/')}/")
-        if not front_ok:
-            print("[SMOKE] [WARN] Frontend root check failed.")
 
     # 4. OpenAPI Docs Check
     verify_endpoint(f"{base_url}/docs")

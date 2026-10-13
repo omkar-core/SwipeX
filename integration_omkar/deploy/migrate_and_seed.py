@@ -119,11 +119,16 @@ def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
         # 4. Initialize Auth DB (tables in swipex_auth)
         try:
             from sqlalchemy import create_engine
-            from backend_mansi.app.database import Base
+            mansi_path = os.path.join(BASE_DIR, "backend_mansi")
+            if mansi_path in sys.path:
+                sys.path.remove(mansi_path)
+            sys.path.insert(0, mansi_path)
+            from app.database import Base
+            import app.models
             logger.info(f"Ensuring Auth schema tables exist in {target_auth_url}...")
             auth_engine = create_engine(target_auth_url)
             Base.metadata.create_all(bind=auth_engine)
-            logger.info("Auth schema tables verified.")
+            logger.info(f"Auth schema tables verified ({len(Base.metadata.tables)} models registered: {list(Base.metadata.tables.keys())}).")
         except Exception as e:
             logger.warning(f"Note: Auth DB initialization skipped or deferred: {e}")
 

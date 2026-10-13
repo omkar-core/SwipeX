@@ -1,4 +1,4 @@
-﻿"""
+"""
 entrypoint_render.py - Production Entrypoint Wrapper for Render Free Tier Services
 Owned by Intern 5 (Platform, Testing & Deployment).
 
@@ -58,7 +58,7 @@ def normalize_db_url(url: str) -> str:
     return url
 
 
-def setup_environment():
+def setup_environment(app_str: str = ""):
     """Validate required env vars, normalize URLs, and extend sys.path."""
     db_url_raw = os.environ.get("DATABASE_URL", "")
     job_db_url_raw = os.environ.get("JOB_DATABASE_URL", "")
@@ -87,14 +87,24 @@ def setup_environment():
     if job_db_url_raw:
         os.environ["JOB_DATABASE_URL"] = normalize_db_url(job_db_url_raw)
 
-    paths_to_add = [
-        BASE_DIR,
-        os.path.join(BASE_DIR, "backend_mansi"),
-        os.path.join(BASE_DIR, "data_hanith"),
-        os.path.join(BASE_DIR, "aiml_hemalatha"),
-        os.path.join(BASE_DIR, "integration_omkar"),
-    ]
-    for p in paths_to_add:
+    # Isolate active service path to avoid namespace collision on 'app'
+    # between backend_mansi/app and aiml_hemalatha/app
+    paths_to_add = [BASE_DIR, os.path.join(BASE_DIR, "integration_omkar")]
+    if "backend_mansi" in app_str:
+        paths_to_add.append(os.path.join(BASE_DIR, "backend_mansi"))
+        paths_to_add.append(os.path.join(BASE_DIR, "data_hanith"))
+    elif "aiml_hemalatha" in app_str:
+        paths_to_add.append(os.path.join(BASE_DIR, "aiml_hemalatha"))
+    elif "data_hanith" in app_str:
+        paths_to_add.append(os.path.join(BASE_DIR, "data_hanith"))
+    else:
+        paths_to_add.extend([
+            os.path.join(BASE_DIR, "backend_mansi"),
+            os.path.join(BASE_DIR, "data_hanith"),
+            os.path.join(BASE_DIR, "aiml_hemalatha"),
+        ])
+
+    for p in reversed(paths_to_add):
         if p not in sys.path:
             sys.path.insert(0, p)
     current_pythonpath = os.environ.get("PYTHONPATH", "")
@@ -173,7 +183,7 @@ def main():
     parser.add_argument("--migrate", action="store_true", help="Force database migration before startup")
     args = parser.parse_args()
 
-    setup_environment()
+    setup_environment(args.app)
 
     if args.migrate or os.environ.get("RUN_MIGRATION", "").lower() in ("true", "1", "yes"):
         maybe_run_migration()

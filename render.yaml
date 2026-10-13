@@ -11,15 +11,7 @@ databases:
 
 services:
   # ---------------------------------------------------------------------------
-  # 1. Key Value / Redis Cache Store (Free Tier: 25 MB RAM, 50 conns)
-  # ---------------------------------------------------------------------------
-  - type: keyvalue
-    name: swipex-omkar-redis
-    plan: free
-    region: oregon
-
-  # ---------------------------------------------------------------------------
-  # 2. Frontend Web Client (Static Site on Global CDN)
+  # 1. Frontend Web Client (Static Site on Global CDN)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-omkar-web
@@ -53,7 +45,7 @@ services:
         value: "false"
 
   # ---------------------------------------------------------------------------
-  # 3. Auth Service & API Gateway (Web Service with WebSocket support)
+  # 2. Auth Service & API Gateway (Web Service with WebSocket support)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-omkar-gateway
@@ -69,11 +61,6 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: swipex-omkar-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: swipex-omkar-redis
           property: connectionString
       - key: RUN_MIGRATION
         # Exactly ONE service runs migrations to avoid race conditions.
@@ -95,7 +82,7 @@ services:
         value: https://swipex-omkar-web.onrender.com
 
   # ---------------------------------------------------------------------------
-  # 4. Job & Data Intelligence Service (Web Service)
+  # 3. Job & Data Intelligence Service (Web Service)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-omkar-jobs
@@ -112,10 +99,6 @@ services:
         fromDatabase:
           name: swipex-omkar-postgres
           property: connectionString
-      - key: JOB_DATABASE_URL
-        fromDatabase:
-          name: swipex-omkar-postgres
-          property: connectionString
       - key: GATEWAY_SHARED_SECRET
         fromService:
           type: web
@@ -125,7 +108,7 @@ services:
         value: "true"
 
   # ---------------------------------------------------------------------------
-  # 5. Resume & AI Career Intelligence Service (Web Service)
+  # 4. Resume & AI Career Intelligence Service (Web Service)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-omkar-resume

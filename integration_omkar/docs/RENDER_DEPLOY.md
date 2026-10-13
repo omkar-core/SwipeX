@@ -1,7 +1,7 @@
 # SwipeX — Render Cloud Deployment Runbook & Troubleshooting Architecture
 **Project:** SwipeX — AI-Powered Swipe-Based Job Discovery & Career Intelligence Platform  
 **Owner:** Intern 5 (Omkar — Platform, Testing, CI/CD & Deployment)  
-**Target Repository:** `https://github.com/omkar-core/SwipeX-.git` (branch `main`)  
+**Target Repository:** `https://github.com/omkar-core/SwipeX.git` (branch `main`)  
 **Audit Date:** October 13, 2026  
 **Infrastructure Spec:** [`render.yaml`](../../render.yaml)
 
@@ -12,8 +12,8 @@
 | Resource | Allocation | Limits & Constraints | Architectural Handling |
 | :--- | :--- | :--- | :--- |
 | **Web Services** | 512 MB RAM, Shared CPU | Sleeps after 15 min idle. Cold start ~30–60 s. **Cannot receive private inbound traffic.** | Upstreams wired via public HTTPS URLs. `smoke_test.py` warms up to 600 s. |
-| **PostgreSQL** | 1 GB Storage, 256 MB RAM | **Expires 30 days after creation.** Strict limit: **1 free DB per workspace.** | Idempotent migration with `pg_advisory_lock` (ID: 849204) runs on gateway boot. |
-| **Key Value (Redis)**| 25 MB RAM, 50 conns | In-memory only; no disk persistence. | Ephemeral token blacklist / session caching. |
+| **PostgreSQL** | 1 GB Storage, 256 MB RAM | **Expires 30 days after creation.** Strict limit: **1 free DB per workspace.** | Idempotent migration with `pg_advisory_lock` (ID: 849204) runs on gateway boot. Shared DB across gateway & job services. |
+| **Redis** | Optional | Free Valkey/Redis not required; `data_hanith` gracefully falls back to Postgres. | Omitted on Render Free Tier to avoid quota exhaustion. |
 | **Static Site** | Unlimited builds, Global CDN | Build-time environment variables only. | SPA rewrite `/* -> /index.html`, `NODE_VERSION: 20.18.0`. |
 | **Pre-Deploy Hooks**| Paid plans only | Unavailable on free tier. | Replaced by `entrypoint_render.py` idempotent startup hook. |
 
@@ -24,16 +24,16 @@
 ### Step 1: Clean Up Old Resources
 1. In the Render Dashboard, check if an existing free PostgreSQL database or old manual web service exists.
 2. If an older free database exists, **Delete** it (Render strictly permits only **1 free PostgreSQL** instance per workspace).
-3. Delete the older standalone `swipex-auth-gateway` service (manual services do not inherit `fromDatabase` environment wiring from Blueprints).
+3. Delete any older standalone manual services (manual services do not inherit `fromDatabase` environment wiring from Blueprints).
 
 ### Step 2: Apply the Blueprint
 1. Click **New +** > **Blueprint**.
-2. Connect your GitHub repository: `omkar-core/SwipeX-`.
+2. Connect your GitHub repository: `omkar-core/SwipeX`.
 3. Branch: **`main`**.
 4. Blueprint File Path: `render.yaml`.
 5. Click **Apply**.
-   - Render provisions `swipex-omkar-postgres` and `swipex-omkar-redis` first.
-   - Once the database is ready, Render provisions the 4 web services in parallel.
+   - Render provisions `swipex-omkar-postgres` first.
+   - Once the database is ready, Render provisions the 4 web services.
 
 ### Step 3: Secrets & Variables Input
 * Render auto-generates:
@@ -42,7 +42,6 @@
   - `GATEWAY_SHARED_SECRET`
 * Auto-wired via Blueprint:
   - `DATABASE_URL` (Internal connection string from `swipex-omkar-postgres`)
-  - `REDIS_URL` (Connection string from `swipex-omkar-redis`)
 * `sync: false` variables: **None**. All variables are either auto-generated, auto-wired, or have safe defaults.
 
 ### Step 4: Verify Service Logs
@@ -64,7 +63,7 @@ Uvicorn running on http://0.0.0.0:10000
 
 ### Step 5: Configure GitHub Variables & Verify CI
 1. In the Render Dashboard, copy each service's actual public URL from the header.
-2. Go to GitHub repo: `https://github.com/omkar-core/SwipeX-` > **Settings** > **Secrets and variables** > **Actions** > **Variables** tab.
+2. Go to GitHub repo: `https://github.com/omkar-core/SwipeX` > **Settings** > **Secrets and variables** > **Actions** > **Variables** tab.
 3. Add Repository Variables:
    - `RENDER_BASE_URL` = `https://swipex-omkar-gateway.onrender.com` (Required)
    - `RENDER_JOB_URL` = `https://swipex-omkar-jobs.onrender.com` (Optional)
@@ -80,11 +79,10 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 
 ### Order of Creation:
 1. `swipex-omkar-postgres` (PostgreSQL)
-2. `swipex-omkar-redis` (Key Value)
-3. `swipex-omkar-jobs` (Web Service)
-4. `swipex-omkar-resume` (Web Service)
-5. `swipex-omkar-gateway` (Web Service)
-6. `swipex-omkar-web` (Static Site)
+2. `swipex-omkar-jobs` (Web Service)
+3. `swipex-omkar-resume` (Web Service)
+4. `swipex-omkar-gateway` (Web Service)
+5. `swipex-omkar-web` (Static Site)
 
 ---
 
@@ -97,14 +95,7 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 
 ---
 
-### Resource 2: Redis Key-Value Store
-* **Name:** `swipex-omkar-redis`
-* **Region:** `oregon`
-* **Plan:** `Free`
-
----
-
-### Resource 3: Job & Data Intelligence Service
+### Resource 2: Job & Data Intelligence Service
 * **Name:** `swipex-omkar-jobs`
 * **Region:** `oregon`
 * **Plan:** `Free`
@@ -115,13 +106,12 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 * **Environment Variables:**
   - `PYTHON_VERSION`: `3.11.9`
   - `DATABASE_URL`: *(Copy Internal Connection String from `swipex-omkar-postgres`)*
-  - `JOB_DATABASE_URL`: *(Same as DATABASE_URL)*
   - `GATEWAY_SHARED_SECRET`: `swipex-secure-cluster-secret-2026`
   - `TRUST_GATEWAY_HEADERS`: `true`
 
 ---
 
-### Resource 4: Resume & AI Career Intelligence Service
+### Resource 3: Resume & AI Career Intelligence Service
 * **Name:** `swipex-omkar-resume`
 * **Region:** `oregon`
 * **Plan:** `Free`
@@ -135,7 +125,7 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 
 ---
 
-### Resource 5: Auth Service & API Gateway
+### Resource 4: Auth Service & API Gateway
 * **Name:** `swipex-omkar-gateway`
 * **Region:** `oregon`
 * **Plan:** `Free`
@@ -146,7 +136,6 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 * **Environment Variables:**
   - `PYTHON_VERSION`: `3.11.9`
   - `DATABASE_URL`: *(Copy Internal Connection String from `swipex-omkar-postgres`)*
-  - `REDIS_URL`: *(Copy Internal Connection String from `swipex-omkar-redis`)*
   - `RUN_MIGRATION`: `true`
   - `JWT_SECRET_KEY`: *(Generate random 32-character string)*
   - `SESSION_SECRET_KEY`: *(Generate random 32-character string)*
@@ -158,7 +147,7 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 
 ---
 
-### Resource 6: Frontend Web Client (Static Site)
+### Resource 5: Frontend Web Client (Static Site)
 * **Name:** `swipex-omkar-web`
 * **Region:** `oregon`
 * **Plan:** `Free`

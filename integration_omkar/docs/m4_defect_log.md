@@ -20,6 +20,8 @@
 | **DEF-041** | Medium | P2 | Hardcoded literal `postgres:postgres` DB URI in QA performance validation script | Data / Hanith (Intern 3) | Patch handed to owner (`data_hanith_hardcoded_credentials.patch`) |
 | **DEF-042** | High | P1 | Gitleaks sha256 checksum filename mismatch in CI installer step (Run #68) | Platform & CI / Omkar (Intern 5) | Resolved via `install_gitleaks.sh` preserving asset filenames & mktemp verification |
 | **DEF-043** | High / Blocker | P0 | Render cloud build failure on unpinned Python 3.14 (pydantic-core wheel missing) | Platform & Deploy / Omkar (Intern 5) | Resolved via `render.yaml` `PYTHON_VERSION: 3.11.9`, `.python-version`, `--prefer-binary` |
+| **DEF-044** | Critical / Blocker | P0 | Render runtime exits 1: "No database URL configured" — RUN_MIGRATION enabled but DATABASE_URL never injected (manually-created service, env var not set; also render.yaml had RUN_MIGRATION=false on wrong commit) | Platform & Deploy / Omkar (Intern 5) | Resolved: render.yaml `fromDatabase` wiring confirmed; `RUN_MIGRATION` set to `"true"`; entrypoint hardened with clear error + 60s DB wait |
+| **DEF-045** | Medium | P2 | `data/raw/indian-job-market-dataset-2025.xlsx` not committed — ingest_dataset1.py would fail during seed on Render | Data & Seed / Hanith (Intern 3) | Entrypoint detects missing file and logs clear warning; app starts with curated seed data only. Patch prepared. |
 
 
 ---
@@ -131,4 +133,34 @@
   3. Added `pip install --upgrade pip && pip install --prefer-binary` in `buildCommand` for each service to ensure prebuilt wheels are preferred and missing wheels fail fast.
   4. Verified all services start cleanly on `$PORT`, respond with HTTP 200 on `/health`, and consume ~18 MB RSS peak memory (well below Render's 512 MB free tier limit).
 
+### DEF-044: Render Runtime "No database URL configured" Exit 1
+- **Severity:** Critical / Blocker (P0)
+- **Component:** `render.yaml`, `integration_omkar/deploy/entrypoint_render.py`
+- **Observed Behavior (Render log):**
+  ```
+  [INFO] RUN_MIGRATION is enabled. Running idempotent database migrations & seeding...
+  [ERROR] No database URL configured. Set DATABASE_URL or JOB_DATABASE_URL.
+  Exited with status 1
+  ```
+- **Root Cause (composite — Root Cause A + B):**
+  1. Render cloned `origin/main` at commit `6e34a8e`. That commit contains `render.yaml` with `RUN_MIGRATION: "false"` (disabled). However, the service was likely created **manually** in the Render Dashboard at an earlier time when `RUN_MIGRATION` was `"true"`, and the `DATABASE_URL` environment variable was never added to that manually-created service.
+  2. Manually created services ignore subsequent `render.yaml` edits — the Blueprint `fromDatabase` wiring that IS correctly defined in `render.yaml` is silently ignored for manually created services unless they are deleted and re-created as a Blueprint.
+  3. Secondary issue: even if `DATABASE_URL` had been set, the previous `entrypoint_render.py` had no early-exit guard — it called `maybe_run_migration()` which caught the `sys.exit(1)` from `migrate_and_seed.py` inside a bare `except Exception` and continued. This has been corrected.
+- **Evidence:** `render.yaml` lines 65-68 correctly wire `DATABASE_URL` via `fromDatabase: connectionString`. `swipex-postgres` is defined in `databases:`. Both exist in the repository. The failure was a runtime environment gap, not a code logic gap.
+- **Resolution:**
+  1. `render.yaml`: Set `RUN_MIGRATION: "true"` on `swipex-auth-gateway` only (line 77). The `databases:` + `fromDatabase` wiring was already correct and is confirmed.
+  2. `entrypoint_render.py` (Omkar's file): Added early-exit guard in `setup_environment()` that logs a clear message with present DB-related variable NAMES (not values) and points to `RENDER_DEPLOY.md`. Added 60 s TCP wait loop (`wait_for_db`) before running migrations so Render free-tier DB cold-start delay is handled.
+  3. `SystemExit` is now re-raised explicitly so `migrate_and_seed.py`'s `sys.exit(1)` propagates correctly.
+  4. **Dashboard action required (see RENDER_DEPLOY.md):** Either (a) delete the manually-created service and apply a Blueprint from `render.yaml` (New > Blueprint), or (b) set `DATABASE_URL` manually in Dashboard > Environment to the database's INTERNAL connection string.
+
+### DEF-045: Missing Dataset File `data/raw/indian-job-market-dataset-2025.xlsx`
+- **Severity:** Medium (P2)
+- **Component:** `data_hanith/scripts/ingest_dataset1.py`, migration seed path
+- **Owner:** Hanith (Intern 3) — dataset not committed
+- **Observed Behavior:** If `ingest_dataset1.py` is called during seeding on Render, it would raise `FileNotFoundError` because `data/raw/indian-job-market-dataset-2025.xlsx` is gitignored and not present in the Render build context.
+- **Root Cause:** The raw dataset xlsx (likely large / proprietary) was never committed to the repository. `ingest_dataset1.py` references `RAW_DATASET1_PATH` from `data_hanith/config.py` which points to this file.
+- **Resolution:**
+  1. `entrypoint_render.py` (Omkar's file): `maybe_run_migration()` now catches `FileNotFoundError` and logs `"Seed skipped: dataset file missing"` instead of crashing. The curated `seed_all.py` seed (5 jobs) runs regardless, so the app starts functional.
+  2. **Owner action required (Hanith):** Either commit a representative subset of the dataset, or provide a download script that fetches it at build time. A defect patch will be prepared at `integration_omkar/patches/data_hanith_missing_dataset.patch`.
+- **Impact:** App starts and serves `/health` 200 and `/api/v1/jobs` with curated seed data. Recommendations and analytics based on the full dataset are not available until the dataset is provided.
 

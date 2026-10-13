@@ -1,0 +1,18 @@
+﻿--- a/data_hanith/scripts/ingest_dataset1.py
++++ b/data_hanith/scripts/ingest_dataset1.py
+@@ -68,6 +68,13 @@ def run_ingestion(dataset_path: str = RAW_DATASET1_PATH, db_url: str = DATABASE_URL):
+     Run full ingestion pipeline: load Excel -> clean -> upsert into PostgreSQL.
+     Idempotent: uses INSERT ... ON CONFLICT DO NOTHING.
+     """
++    # DEF-045: Graceful skip when the dataset file is not present (e.g. Render cloud build).
++    # The file is gitignored and must be provided separately (see data_hanith/README or
++    # integration_omkar/docs/m4_defect_log.md DEF-045 for resolution steps).
++    if not os.path.exists(dataset_path):
++        import logging as _log
++        _log.getLogger(__name__).warning(
++            "Seed skipped: dataset file '%s' not found. Ensure the xlsx is present "
++            "or download it with 'python data_hanith/scripts/fetch_dataset.py' before ingesting.",
++            dataset_path,
++        )
++        return
+     logger.info(f"Starting ingestion from: {dataset_path}")

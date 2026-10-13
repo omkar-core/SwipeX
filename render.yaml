@@ -72,9 +72,10 @@ services:
           name: swipex-redis
           property: connectionString
       - key: RUN_MIGRATION
-        # Set to "true" only after your Render PostgreSQL database is provisioned and ready.
-        # Run migrations manually: python integration_omkar/deploy/migrate_and_seed.py
-        value: "false"
+        # DATABASE_URL is wired via fromDatabase below; entrypoint waits up to 60 s for
+        # the Postgres service to wake before migrating. Safe to keep true. Only ONE
+        # service (this gateway) runs migrations to avoid race conditions.
+        value: "true"
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: SESSION_SECRET_KEY

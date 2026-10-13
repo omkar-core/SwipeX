@@ -1,165 +1,159 @@
-# SwipeX — Render Cloud Deployment Runbook & Free Tier Architecture
+﻿# SwipeX — Render Cloud Deployment Runbook & Free Tier Architecture
 **Project:** SwipeX — AI-Powered Swipe-Based Job Discovery & Career Intelligence Platform  
 **Owner:** Intern 5 (Omkar — Platform, Testing, CI/CD & Deployment)  
-**Branch:** `Team-4`  
-**Date of Audit & Verification:** October 10, 2026  
-**Infrastructure-as-Code Spec:** [`render.yaml`](file:///d:/Webapp/Working_webapps/SwipeX_infosys_springboard_Project/AI-Powered-Swipe-Based-Job-Discovery-and-Personalized-Career-Intelligence-Platform/render.yaml)
+**Branch:** `Team-4` (push target: `origin main`)  
+**Date of Audit & Verification:** October 13, 2026  
+**Infrastructure-as-Code Spec:** [`render.yaml`](../../render.yaml)
 
 ---
 
-## 1. Verified Render Free Tier Limits & Constraints (October 2026)
+## QUICK FIX — Render Service "No database URL configured" (DEF-044)
 
-Based on official Render documentation and pricing audits conducted on October 10, 2026:
+> **Root cause confirmed:** The Render service (`swipex-auth-gateway`) was created **manually** in the
+> Dashboard. Manually-created services **do not** inherit env vars wired in `render.yaml` via
+> `fromDatabase`. The Blueprint was never applied, so `DATABASE_URL` was never injected.
 
-| Resource Type | Free Tier Allocation | Expiration & Limitations | Architectural Mitigation in SwipeX |
+### Option A — Re-create as Blueprint (Recommended)
+
+1. In the Render Dashboard → locate `swipex-auth-gateway` → **Delete** it (Settings → Delete Service).
+2. Click **New + → Blueprint**.
+3. Connect repo: `omkar-core/SwipeX-` (or the upstream `springboardmentor54321v/...`).
+4. Branch: **`main`** (Render tracks `main`; ensure the fixed commit has been pushed — see Step 6).
+5. Render will parse `render.yaml` and show all 6 components.  
+   Verify you see: `swipex-postgres`, `swipex-redis`, `swipex-frontend`, `swipex-auth-gateway`,  
+   `swipex-job-service`, `swipex-resume-service`.
+6. Click **Apply**. Render provisions the database first, then wires `DATABASE_URL` automatically.
+
+### Option B — Keep Manual Service, Add DATABASE_URL Manually
+
+If you prefer not to delete the service:
+
+1. Render Dashboard → select the `swipex-postgres` database → **Connect** tab.
+2. Copy the **Internal Connection String** (format: `postgres://user:pass@dpg-xxx-a/dbname`).  
+   ⚠️ Use INTERNAL (no `.render.com` in the host) — both service and DB must be in `oregon`.
+3. Render Dashboard → `swipex-auth-gateway` → **Environment** tab → **Add Environment Variable**:
+   - Key: `DATABASE_URL`
+   - Value: *(paste the internal connection string — keep this secret, never share it)*
+4. Click **Save Changes**. The service restarts automatically.
+
+**Variable names to set (names only — never paste passwords here or in chat):**
+
+| Variable | How Provisioned |
+|---|---|
+| `DATABASE_URL` | Blueprint `fromDatabase` auto-wired **OR** manually from DB Connect tab |
+| `JOB_DATABASE_URL` | Blueprint auto-wired on `swipex-job-service` only |
+| `REDIS_URL` | Blueprint `fromService` auto-wired |
+| `JWT_SECRET_KEY` | Blueprint `generateValue: true` (auto-generated) |
+| `SESSION_SECRET_KEY` | Blueprint `generateValue: true` (auto-generated) |
+| `GATEWAY_SHARED_SECRET` | Blueprint `generateValue: true` (auto-generated) |
+| `PORT` | Injected by Render runtime (do not set manually) |
+| `RUN_MIGRATION` | Set to `"true"` in `render.yaml` on gateway service only |
+
+---
+
+## 1. Which Repo/Branch Render Must Deploy From
+
+| | Value |
+|---|---|
+| **GitHub repo Render tracks** | `omkar-core/SwipeX-` (origin) |
+| **Branch** | `main` |
+| **render.yaml location** | Repository root (`render.yaml`) |
+| **After I say push** | `git push origin Team-4:main` |
+
+> ⚠️ If the upstream `springboardmentor54321v/...` repo is what Render is connected to,
+> push there instead: `git push upstream Team-4:main`.
+
+---
+
+## 2. Verified Render Free Tier Limits (October 13, 2026)
+
+| Resource | Allocation | Limits | Mitigation |
 |---|---|---|---|
-| **Web Services (Python / ASGI)** | 512 MB RAM, 0.1 CPU, 750 free instance-hours/month shared | Spins down to sleep after **15 minutes of inactivity**. Cold start takes **50s – 120s** to boot. | `smoke_test.py` includes a cold-start polling loop with 120s timeout and warm-up pings. |
-| **PostgreSQL Database** | 1 GB SSD storage, 256 MB RAM | **Expires 30 days after creation**. 14-day grace period to upgrade or export. No connection pooling or automated backups included. | Idempotent schema + seed script (`migrate_and_seed.py`) can re-initialize a replacement database in seconds on restart. |
-| **Key Value (Redis / Valkey)** | 25 MB RAM, 50 maximum concurrent connections | **No disk persistence** (in-memory only). Data evicted if memory ceiling reached. | Used strictly for ephemeral JWT blocklist, rate limiting, and temporary cache. No business data stored in Redis. |
-| **Static Site (Frontend)** | Unlimited builds, Global CDN, 100 GB bandwidth/month | SPA routing rewrite (`/*` -> `/index.html`) required. | Configured via `routes` in `render.yaml` with security headers (`X-Frame-Options: DENY`, `nosniff`). |
-| **Persistent Disks & Private Services** | Paid plans only (disks starting at $0.25/GB/mo; private services require paid team plans) | Not available on Render Free Tier. | MinIO & ChromaDB fallback to in-process SQLite / ephemeral disk for local demo, or cloud S3/Chroma when credentials provided. |
-| **Pre-Deploy Commands (`preDeployCommand`)** | Paid plans only | Not supported on Free Web Services. | Replaced by `entrypoint_render.py`, which normalizes DB URLs and executes `migrate_and_seed.py` on container boot. |
-
-### 1.1 Python Version Pinning & Build Architecture (DEF-043 Fix)
-* **Root Cause of Build Failure:** Render defaults to **Python 3.14.3** for all services created after February 11, 2026. `pydantic-core==2.23.4` (locked by `pydantic==2.9.2`) does not publish prebuilt binary wheels for Python 3.14. As a result, `pip` attempted to compile `pydantic-core` from source tarball using Rust/Maturin. Because Render's build environment enforces a read-only filesystem outside the project virtualenv, Cargo failed immediately with `cargo: Read-only file system (os error 30)`.
-* **Resolution:** 
-  1. Explicitly pinned `PYTHON_VERSION: 3.11.9` in `render.yaml` for all native Python web services (`swipex-auth-gateway`, `swipex-job-service`, `swipex-resume-service`).
-  2. Added repository root [`.python-version`](file:///d:/Webapp/Working_webapps/SwipeX_infosys_springboard_Project/AI-Powered-Swipe-Based-Job-Discovery-and-Personalized-Career-Intelligence-Platform/.python-version) containing `3.11.9` as a synchronized backup.
-  3. Updated build commands to `pip install --upgrade pip && pip install --prefer-binary -r ...` to guarantee that prebuilt binary wheels are prioritized and missing wheels fail fast.
-* **Prebuilt Wheel Parity:** Python 3.11.9 has 100% prebuilt binary wheel coverage on Linux (`manylinux_2_17_x86_64`) for all dependencies including `pydantic-core==2.23.4`, `psycopg2-binary==2.9.9`, `bcrypt==4.0.1`, `numpy==2.4.6`, `pandas==3.0.5`, `scikit-learn==1.9.1`, requiring 0 source compilation and 0 Rust dependencies.
-* **Runtime Memory Footprint:** Verified working set memory per service is ~18 MB RSS peak, well below Render's 512 MB free tier ceiling:
-  * `swipex-auth-gateway`: ~18.10 MB RSS
-  * `swipex-job-service`: ~18.16 MB RSS
-  * `swipex-resume-service`: ~17.99 MB RSS
+| Web Services | 512 MB RAM, 0.1 CPU | Sleeps after 15 min inactivity. Cold start 50–120 s. | `smoke_test.py` polls with 120 s timeout. |
+| **PostgreSQL** | 1 GB SSD, 256 MB RAM, **PostgreSQL 16** | **Expires 30 days after creation**. 14-day grace. No pooling or backups. One DB per workspace. | Idempotent `migrate_and_seed.py` re-initializes a replacement DB in seconds. |
+| Key Value (Redis) | 25 MB RAM, 50 connections | No disk persistence. | Used for ephemeral JWT blocklist only. |
+| Static Site | Unlimited builds, 100 GB bandwidth/month | — | Configured with SPA rewrite + security headers. |
+| Pre-Deploy Commands | Paid plans only | Not available on free tier. | Replaced by `entrypoint_render.py` which runs migration on startup. |
 
 ---
 
-## 2. Infrastructure as Code Architecture (`render.yaml`)
+## 3. Infrastructure-as-Code Architecture (`render.yaml`)
 
-SwipeX defines its complete multi-tier cloud infrastructure using Render Blueprints:
+```
+databases:
+  swipex-postgres  (plan: free, region: oregon, PostgreSQL 16)
 
-```mermaid
-graph TD
-    Client["Browser / Mobile Client"] -->|HTTPS / WSS| CDN["Render Static Site (swipex-frontend)"]
-    CDN -->|REST API & WebSockets| Gateway["API Gateway (swipex-auth-gateway)"]
-    Gateway -->|Private HTTPS| JobSvc["Job Intelligence Service (swipex-job-service)"]
-    Gateway -->|Private HTTPS| ResumeSvc["Resume AI Service (swipex-resume-service)"]
-    Gateway -->|TLS Pool| DB[("Render PostgreSQL (swipex-postgres)")]
-    JobSvc -->|TLS Pool| DB
-    Gateway -->|Valkey Protocol| Redis[("Render Key Value (swipex-redis)")]
+keyvalue:
+  swipex-redis     (plan: free, region: oregon)
+
+web (static):
+  swipex-frontend  (frontend_boomika, npm ci && npm run build, dist/)
+
+web (python):
+  swipex-auth-gateway   <- DATABASE_URL wired, RUN_MIGRATION=true (migrator)
+  swipex-job-service    <- DATABASE_URL + JOB_DATABASE_URL wired
+  swipex-resume-service <- no DB (aiml_hemalatha does not read DATABASE_URL)
 ```
 
-### Component Breakdown:
-1. **`swipex-frontend`** (`runtime: static`):
-   - Path: `frontend_boomika`
-   - Build: `npm ci && npm run build`
-   - Publish: `dist`
-   - Injected Env: `VITE_BASE_API_URL`, `VITE_WS_URL`, `VITE_USE_MOCK=false`
-2. **`swipex-auth-gateway`** (`runtime: python`):
-   - Path: Root
-   - Start Command: `python integration_omkar/deploy/entrypoint_render.py --app backend_mansi.app.main:app`
-   - Binds to: `0.0.0.0:$PORT`
-   - Auto-generated Secrets: `JWT_SECRET_KEY`, `SESSION_SECRET_KEY`, `GATEWAY_SHARED_SECRET`
-3. **`swipex-job-service`** (`runtime: python`):
-   - Path: Root
-   - Start Command: `python integration_omkar/deploy/entrypoint_render.py --app data_hanith.main:app`
-4. **`swipex-resume-service`** (`runtime: python`):
-   - Path: Root
-   - Start Command: `python integration_omkar/deploy/entrypoint_render.py --app aiml_hemalatha.app.main:app`
-5. **`swipex-postgres`** (`databaseName: swipex_auth`, `plan: free`):
-   - Referenced dynamically via `fromDatabase: connectionString`.
-6. **`swipex-redis`** (`type: keyvalue`, `plan: free`):
-   - Referenced dynamically via `fromService: connectionString`.
+All Python services: region `oregon`, Python 3.11.9, `--prefer-binary`.
 
 ---
 
-## 3. Environment Variable & Secrets Mapping Matrix
+## 4. Step-by-Step Deploy (After Code Is Pushed)
 
-| Variable Name | Target Service | Provisioning Mechanism | Production Location |
-|---|---|---|---|
-| `DATABASE_URL` | Gateway, Job Service | Render Blueprint (`fromDatabase: connectionString`) | Render Internal PostgreSQL Connection |
-| `REDIS_URL` | Gateway | Render Blueprint (`fromService: connectionString`) | Render Internal Valkey Connection |
-| `PORT` | All Web Services | Injected automatically by Render | Render Runtime Environment |
-| `JWT_SECRET_KEY` | Gateway | Render Blueprint (`generateValue: true`) | Render Service Environment |
-| `SESSION_SECRET_KEY` | Gateway | Render Blueprint (`generateValue: true`) | Render Service Environment |
-| `GATEWAY_SHARED_SECRET` | Gateway, Job Service | Blueprint (`generateValue: true` + `fromService`) | Shared Internal Token |
-| `CORS_ORIGINS` | Gateway | Blueprint static value (`https://swipex-frontend.onrender.com`) | Render Service Environment |
-| `JOB_SERVICE_URL` | Gateway, Resume Service | Blueprint static value (`https://swipex-job-service.onrender.com`) | Render Internal / Public DNS |
-| `RESUME_SERVICE_URL` | Gateway | Blueprint static value (`https://swipex-resume-service.onrender.com`) | Render Internal / Public DNS |
-| `MATCHING_ENGINE_URL`| Gateway | Blueprint static value (`https://swipex-resume-service.onrender.com`) | Render Internal / Public DNS |
-| `RUN_MIGRATION` | Gateway | Blueprint static value (`true`) | Render Service Environment |
-| `RENDER_DEPLOY_HOOK_*`| CI Deploy Stage | GitHub Secrets | GitHub Repo Settings -> Secrets |
-| `RENDER_BASE_URL` | CI Smoke Test Stage | GitHub Repository Variable | GitHub Repo Settings -> Variables |
+1. **Push code** (only after I say "push"):
+   ```
+   git push origin Team-4:main
+   ```
+2. **Apply Blueprint** (if not already done): New + → Blueprint → connect repo → branch `main` → Apply.
+3. **Wait** for Render to provision `swipex-postgres` first (~60 s), then services deploy.
+4. **Check logs** on `swipex-auth-gateway`:
+   - Should see: `Normalized DATABASE_URL scheme: postgres:// -> postgresql://`
+   - Should see: `Database TCP port reachable on attempt N.`
+   - Should see: `Database migration step completed successfully.`
+   - Should see: `Started server process`
+5. **Verify**:
+   - `GET https://swipex-auth-gateway.onrender.com/health` → HTTP 200
+   - `GET https://swipex-auth-gateway.onrender.com/api/v1/jobs` → HTTP 200 (5 curated jobs or empty list)
+   - `GET https://swipex-job-service.onrender.com/health` → HTTP 200
+   - `GET https://swipex-resume-service.onrender.com/health` → HTTP 200
 
 ---
 
-## 4. Step-by-Step Render Deployment Guide
+## 5. Known Free-Tier Constraints & Warnings
 
-### Step 1: Create Blueprint in Render Dashboard
-1. Log in to [Render Dashboard](https://dashboard.render.com).
-2. Click **New +** -> **Blueprint**.
-3. Connect repository `springboardmentor54321v/AI-Powered-Swipe-Based-Job-Discovery-and-Personalized-Career-Intelligence-Platform`.
-4. Select branch `Team-4` (or `main` upon release).
-5. Render will automatically parse `render.yaml` and display all 6 components (`swipex-postgres`, `swipex-redis`, `swipex-frontend`, `swipex-auth-gateway`, `swipex-job-service`, `swipex-resume-service`).
-6. Click **Apply**.
+- **Postgres expires 30 days after creation.** When it expires, re-create the database (Dashboard → Databases → New → Free), then update `DATABASE_URL` on all services (or delete+re-Blueprint).
+- **Cold start 50–120 s.** First request after inactivity will be slow. This is expected.
+- **512 MB RAM limit.** Verified working set ~18 MB RSS per service. No action needed.
+- **One database per free workspace.** All three Python services share the same `swipex-postgres` instance.
+- **Missing dataset (DEF-045):** `data/raw/indian-job-market-dataset-2025.xlsx` is not in the repo. The seed step logs a warning and the app starts with 5 curated jobs. Contact Hanith (Intern 3) for the full dataset.
+- **Limits verified:** October 13, 2026 — [render.com/docs/free](https://render.com/docs/free).
 
-### Step 2: Configure Deploy Hooks for CI Continuous Deployment
-1. For each web service in the Render Dashboard:
-   - Go to **Settings** -> **Deploy Hook**.
-   - Copy the unique Webhook URL (`https://api.render.com/deploy/srv-xxxx?key=yyyy`).
-2. In GitHub Repository:
-   - Navigate to **Settings** -> **Secrets and variables** -> **Actions**.
-   - Add the following Secrets:
-     - `RENDER_DEPLOY_HOOK_GATEWAY`
-     - `RENDER_DEPLOY_HOOK_JOB`
-     - `RENDER_DEPLOY_HOOK_RESUME`
-     - `RENDER_DEPLOY_HOOK_FRONTEND`
-   - Add Repository Variable:
-     - `RENDER_BASE_URL`: `https://swipex-auth-gateway.onrender.com`
+---
 
-### Step 3: Verify Deployment & Cold Starts
-Run the automated post-deploy smoke test:
+## 6. Rollback
+
+**Instant (recommended):** Dashboard → service → Deploys tab → previous healthy commit → `...` → Rollback to this deploy. Traffic switches in < 15 s.
+
+**Git rollback:**
 ```bash
-python integration_omkar/scripts/smoke_test.py --base-url https://swipex-auth-gateway.onrender.com --timeout 180
-```
-
----
-
-## 5. Rollback Runbook (Zero-Downtime Recovery)
-
-If a deployment fails smoke tests or introduces regressions:
-
-### Method 1: Instant Dashboard Rollback (Recommended)
-1. Go to Render Dashboard -> Select failed service (e.g. `swipex-auth-gateway`).
-2. Click the **Events** or **Deploys** tab.
-3. Locate the previous healthy deployment (labeled with previous Git commit SHA).
-4. Click the three dots `...` on that deploy -> Select **Rollback to this deploy**.
-5. Render immediately switches traffic back to the previous immutable build container in < 15 seconds.
-
-### Method 2: Git Rollback
-```bash
-git checkout main
 git revert HEAD --no-edit
 git push origin main
 ```
-This triggers the CI pipeline, which validates the reverted code and triggers the Render Deploy Hooks.
 
 ---
 
-## 6. Recommended GitHub Branch Protection Settings
+## 7. Python Version & Wheel Parity (DEF-043)
 
-To ensure zero regressions land on production:
-1. Target branch: `main` and `Team-4`.
-2. Require pull request before merging: **Yes** (1 approval).
-3. Require status checks to pass before merging:
-   - `Lint & Code Style Gate`
-   - `Frontend Vitest & Production Build`
-   - `Unit Test Suite (backend)`
-   - `Unit Test Suite (aiml)`
-   - `Unit Test Suite (m3-schema)`
-   - `Unit Test Suite (m4)`
-   - `Unit Test Suite (integration-unit)`
-   - `Render Blueprint & Compose Validation`
-   - `Live Docker Stack E2E, RBAC & Contracts`
-   - `CI Pipeline Quality & Gate Summary`
-4. Require linear history: **Yes**.
+All Python services are pinned to **Python 3.11.9** (`PYTHON_VERSION: 3.11.9` in `render.yaml` + `.python-version` at repo root). All locked dependencies including `pydantic-core==2.23.4`, `pandas==3.0.5`, `numpy==2.4.6` have 100% prebuilt `manylinux` wheel coverage on 3.11.9 — no source compilation required.
+
+---
+
+## 8. render-config Test Suite
+
+Run locally to validate render.yaml and compose config before pushing:
+```bash
+python integration_omkar/scripts/run_suites.py --suite render-config
+docker compose -f docker-compose.dev.yml config
+```
+Both must exit 0.

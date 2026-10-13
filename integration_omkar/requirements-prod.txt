@@ -1,3 +1,9 @@
 psycopg2-binary>=2.9.9
 pyyaml>=6.0
 requests>=2.31.0
+# Version-drift guard: data_hanith/requirements.txt has pandas>=2.2.0 (unbounded).
+# Pin to the exact versions validated in venv311 and integration_omkar/ci/constraints.txt
+# so Render does not pull a newer pandas/numpy that breaks data_hanith ingestion.
+# Checked against constraints.txt: pandas==3.0.5, numpy==2.4.6 (October 2026).
+pandas==3.0.5
+numpy==2.4.6

@@ -317,7 +317,17 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Trigger Render Deploy Hooks
+      - name: Validate Render Deployment Variables
+        env:
+          RENDER_BASE_URL: ${{ vars.RENDER_BASE_URL }}
+        run: |
+          if [ -z "$RENDER_BASE_URL" ]; then
+            echo "::error::Set repo variable RENDER_BASE_URL (Settings > Secrets and variables > Actions > Variables) to the gateway URL shown in the Render dashboard."
+            exit 1
+          fi
+          echo "Render Gateway Target: $RENDER_BASE_URL"
+
+      - name: Trigger Render Deploy Hooks (Optional)
         env:
           RENDER_DEPLOY_HOOK_GATEWAY: ${{ secrets.RENDER_DEPLOY_HOOK_GATEWAY }}
           RENDER_DEPLOY_HOOK_JOB: ${{ secrets.RENDER_DEPLOY_HOOK_JOB }}
@@ -327,5 +337,15 @@ jobs:
           python integration_omkar/deploy/trigger_render_deploy.py
 
       - name: Post-Deployment Production Smoke Test
+        env:
+          RENDER_BASE_URL: ${{ vars.RENDER_BASE_URL }}
+          RENDER_JOB_URL: ${{ vars.RENDER_JOB_URL }}
+          RENDER_RESUME_URL: ${{ vars.RENDER_RESUME_URL }}
+          RENDER_FRONTEND_URL: ${{ vars.RENDER_FRONTEND_URL }}
         run: |
-          python integration_omkar/scripts/smoke_test.py --base-url "${{ vars.RENDER_BASE_URL || 'https://swipex-auth-gateway.onrender.com' }}" --timeout 180
+          python integration_omkar/scripts/smoke_test.py \
+            --base-url "$RENDER_BASE_URL" \
+            ${RENDER_JOB_URL:+--job-url "$RENDER_JOB_URL"} \
+            ${RENDER_RESUME_URL:+--resume-url "$RENDER_RESUME_URL"} \
+            ${RENDER_FRONTEND_URL:+--frontend-url "$RENDER_FRONTEND_URL"} \
+            --timeout 600

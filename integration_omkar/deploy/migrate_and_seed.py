@@ -52,6 +52,9 @@ def wait_for_db(db_url: str, max_retries: int = 30, retry_delay: float = 1.0) ->
             time.sleep(retry_delay)
     return False
 
+SWIPEX_MIGRATION_LOCK_ID = 849204  # Unique 32-bit advisory lock key for SwipeX
+
+
 def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
     # Determine Job Service DB URL
     # NOTE: No hardcoded hostname fallback — Render injects DATABASE_URL / JOB_DATABASE_URL
@@ -79,34 +82,65 @@ def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
         logger.error("Could not reach Job Database. Aborting migration.")
         sys.exit(1)
 
-    # 1. Apply data_hanith canonical schema
-    schema_sql_path = os.path.join(BASE_DIR, "data_hanith", "db", "schema.sql")
-    from data_hanith.db.connection import init_db
-    logger.info(f"[2/4] Applying canonical schema from {schema_sql_path}...")
-    init_db(target_job_url, schema_sql_path)
+    lock_conn = None
+    lock_acquired = False
+    if "postgres" in target_job_url:
+        try:
+            from data_hanith.db.connection import get_raw_connection
+            lock_conn, _ = get_raw_connection(target_job_url)
+            if hasattr(lock_conn, "autocommit"):
+                lock_conn.autocommit = True
+            cur = lock_conn.cursor()
+            logger.info(f"Acquiring Postgres advisory lock ({SWIPEX_MIGRATION_LOCK_ID}) to coordinate concurrent migrations...")
+            cur.execute("SELECT pg_advisory_lock(%s);", (SWIPEX_MIGRATION_LOCK_ID,))
+            lock_acquired = True
+            cur.close()
+            logger.info("Postgres advisory lock acquired successfully.")
+        except Exception as lock_err:
+            logger.warning(f"Failed to acquire advisory lock (proceeding with migration): {lock_err}")
 
-    # 2. Apply M4 schema extension
-    from data_hanith.scripts.apply_m4_migration import apply_migration
-    logger.info("[3/4] Applying Milestone 4 schema extensions...")
-    apply_migration(target_job_url)
-
-    # 3. Seed baseline data if empty
-    from integration_omkar.scripts.seed_all import seed_database
-    logger.info("[4/4] Ensuring baseline curated seed data exists...")
-    seed_database(target_job_url)
-
-    # 4. Initialize Auth DB (tables in swipex_auth)
     try:
-        from sqlalchemy import create_engine
-        from backend_mansi.app.database import Base
-        logger.info(f"Ensuring Auth schema tables exist in {target_auth_url}...")
-        auth_engine = create_engine(target_auth_url)
-        Base.metadata.create_all(bind=auth_engine)
-        logger.info("Auth schema tables verified.")
-    except Exception as e:
-        logger.warning(f"Note: Auth DB initialization skipped or deferred: {e}")
+        # 1. Apply data_hanith canonical schema
+        schema_sql_path = os.path.join(BASE_DIR, "data_hanith", "db", "schema.sql")
+        from data_hanith.db.connection import init_db
+        logger.info(f"[2/4] Applying canonical schema from {schema_sql_path}...")
+        init_db(target_job_url, schema_sql_path)
 
-    logger.info("Database migration and baseline seeding complete! Exit Code 0.")
+        # 2. Apply M4 schema extension
+        from data_hanith.scripts.apply_m4_migration import apply_migration
+        logger.info("[3/4] Applying Milestone 4 schema extensions...")
+        apply_migration(target_job_url)
+
+        # 3. Seed baseline data if empty
+        from integration_omkar.scripts.seed_all import seed_database
+        logger.info("[4/4] Ensuring baseline curated seed data exists...")
+        seed_database(target_job_url)
+
+        # 4. Initialize Auth DB (tables in swipex_auth)
+        try:
+            from sqlalchemy import create_engine
+            from backend_mansi.app.database import Base
+            logger.info(f"Ensuring Auth schema tables exist in {target_auth_url}...")
+            auth_engine = create_engine(target_auth_url)
+            Base.metadata.create_all(bind=auth_engine)
+            logger.info("Auth schema tables verified.")
+        except Exception as e:
+            logger.warning(f"Note: Auth DB initialization skipped or deferred: {e}")
+
+        logger.info("Database migration and baseline seeding complete! Exit Code 0.")
+    finally:
+        if lock_acquired and lock_conn:
+            try:
+                cur = lock_conn.cursor()
+                cur.execute("SELECT pg_advisory_unlock(%s);", (SWIPEX_MIGRATION_LOCK_ID,))
+                cur.close()
+                logger.info("Postgres advisory lock released.")
+            except Exception as e:
+                logger.warning(f"Error releasing advisory lock: {e}")
+            try:
+                lock_conn.close()
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     job_url = sys.argv[1] if len(sys.argv) > 1 else None

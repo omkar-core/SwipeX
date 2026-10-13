@@ -3,7 +3,7 @@
 # Verified for Render Free Tier Limits (October 2026)
 
 databases:
-  - name: swipex-postgres
+  - name: swipex-omkar-postgres
     databaseName: swipex_auth
     user: swipex
     plan: free
@@ -14,7 +14,7 @@ services:
   # 1. Key Value / Redis Cache Store (Free Tier: 25 MB RAM, 50 conns)
   # ---------------------------------------------------------------------------
   - type: keyvalue
-    name: swipex-redis
+    name: swipex-omkar-redis
     plan: free
     region: oregon
 
@@ -22,7 +22,7 @@ services:
   # 2. Frontend Web Client (Static Site on Global CDN)
   # ---------------------------------------------------------------------------
   - type: web
-    name: swipex-frontend
+    name: swipex-omkar-web
     runtime: static
     plan: free
     region: oregon
@@ -42,9 +42,11 @@ services:
         value: nosniff
     envVars:
       - key: VITE_BASE_API_URL
-        value: https://swipex-auth-gateway.onrender.com/api/v1
+        value: https://swipex-omkar-gateway.onrender.com/api/v1
+      - key: VITE_API_URL
+        value: https://swipex-omkar-gateway.onrender.com
       - key: VITE_WS_URL
-        value: wss://swipex-auth-gateway.onrender.com/api/v1/notifications/ws
+        value: wss://swipex-omkar-gateway.onrender.com/api/v1/notifications/ws
       - key: VITE_USE_MOCK
         value: "false"
 
@@ -52,7 +54,7 @@ services:
   # 3. Auth Service & API Gateway (Web Service with WebSocket support)
   # ---------------------------------------------------------------------------
   - type: web
-    name: swipex-auth-gateway
+    name: swipex-omkar-gateway
     runtime: python
     plan: free
     region: oregon
@@ -64,17 +66,16 @@ services:
         value: 3.11.9
       - key: DATABASE_URL
         fromDatabase:
-          name: swipex-postgres
+          name: swipex-omkar-postgres
           property: connectionString
       - key: REDIS_URL
         fromService:
           type: keyvalue
-          name: swipex-redis
+          name: swipex-omkar-redis
           property: connectionString
       - key: RUN_MIGRATION
-        # DATABASE_URL is wired via fromDatabase below; entrypoint waits up to 60 s for
-        # the Postgres service to wake before migrating. Safe to keep true. Only ONE
-        # service (this gateway) runs migrations to avoid race conditions.
+        # Exactly ONE service runs migrations to avoid race conditions.
+        # Protected by Postgres advisory lock (pg_advisory_lock).
         value: "true"
       - key: JWT_SECRET_KEY
         generateValue: true
@@ -83,19 +84,19 @@ services:
       - key: GATEWAY_SHARED_SECRET
         generateValue: true
       - key: JOB_SERVICE_URL
-        value: https://swipex-job-service.onrender.com
+        value: https://swipex-omkar-jobs.onrender.com
       - key: RESUME_SERVICE_URL
-        value: https://swipex-resume-service.onrender.com
+        value: https://swipex-omkar-resume.onrender.com
       - key: MATCHING_ENGINE_URL
-        value: https://swipex-resume-service.onrender.com
+        value: https://swipex-omkar-resume.onrender.com
       - key: CORS_ORIGINS
-        value: https://swipex-frontend.onrender.com
+        value: https://swipex-omkar-web.onrender.com
 
   # ---------------------------------------------------------------------------
   # 4. Job & Data Intelligence Service (Web Service)
   # ---------------------------------------------------------------------------
   - type: web
-    name: swipex-job-service
+    name: swipex-omkar-jobs
     runtime: python
     plan: free
     region: oregon
@@ -107,16 +108,16 @@ services:
         value: 3.11.9
       - key: DATABASE_URL
         fromDatabase:
-          name: swipex-postgres
+          name: swipex-omkar-postgres
           property: connectionString
       - key: JOB_DATABASE_URL
         fromDatabase:
-          name: swipex-postgres
+          name: swipex-omkar-postgres
           property: connectionString
       - key: GATEWAY_SHARED_SECRET
         fromService:
           type: web
-          name: swipex-auth-gateway
+          name: swipex-omkar-gateway
           envVarKey: GATEWAY_SHARED_SECRET
       - key: TRUST_GATEWAY_HEADERS
         value: "true"
@@ -125,7 +126,7 @@ services:
   # 5. Resume & AI Career Intelligence Service (Web Service)
   # ---------------------------------------------------------------------------
   - type: web
-    name: swipex-resume-service
+    name: swipex-omkar-resume
     runtime: python
     plan: free
     region: oregon
@@ -136,4 +137,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: JOB_SERVICE_URL
-        value: https://swipex-job-service.onrender.com
+        value: https://swipex-omkar-jobs.onrender.com

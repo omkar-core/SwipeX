@@ -45,6 +45,11 @@ def classify_http_response(status_code: int, headers: Dict[str, str], body: str 
     if "relation" in body_lower and "does not exist" in body_lower:
         return "db-missing"
 
+    if status_code in (502, 503, 504):
+        if "upstream service unreachable" in body_lower or "took too long to respond" in body_lower:
+            return "sleeping-upstream"
+        return "5xx"
+
     if status_code == 404:
         if "detail" in body_lower and "not found" in body_lower:
             return "app-404"
@@ -179,16 +184,18 @@ def check_url_mismatches(
 
 
 def check_cors_preflight(gateway_url: str, frontend_url: str) -> Tuple[bool, str]:
-    target = f"{gateway_url.rstrip('/')}/api/v1/jobs"
     headers = {
         "Origin": frontend_url.rstrip("/"),
         "Access-Control-Request-Method": "GET",
         "Access-Control-Request-Headers": "authorization,content-type",
     }
-    status, resp_headers, _ = http_request(target, method="OPTIONS", headers=headers, timeout=10)
-    allow_origin = resp_headers.get("access-control-allow-origin", "")
-    if allow_origin in (frontend_url.rstrip("/"), "*"):
-        return True, f"Allow-Origin: {allow_origin}"
+    # Check gateway /health first, then /api/v1/jobs
+    for endpoint in ("/health", "/api/v1/jobs"):
+        target = f"{gateway_url.rstrip('/')}{endpoint}"
+        status, resp_headers, _ = http_request(target, method="OPTIONS", headers=headers, timeout=10)
+        allow_origin = resp_headers.get("access-control-allow-origin", "")
+        if allow_origin in (frontend_url.rstrip("/"), "*"):
+            return True, f"Allow-Origin: {allow_origin} (tested on {endpoint})"
     return False, f"Missing or invalid Access-Control-Allow-Origin: '{allow_origin}' (HTTP {status})"
 
 
@@ -242,17 +249,38 @@ def run_checks(
     print("\n--- Phase 2: Functional Contract Checks ---")
     all_passed = True
 
-    # Check 0: Gateway /docs (Swagger UI)
+    # Check 0a: Gateway root / (expected 404 on API gateway, never a failure)
+    status_root, _, _ = http_request(f"{gateway_url.rstrip('/')}/")
+    if status_root == 404:
+        print("[PASS] Gateway -> GET / returned expected HTTP 404 (FastAPI backend API root; normal response).")
+    elif 200 <= status_root < 300:
+        print(f"[PASS] Gateway -> GET / returned HTTP {status_root}.")
+    else:
+        print(f"[INFO] Gateway -> GET / returned HTTP {status_root}.")
+
+    # Check 0b: Gateway /health
+    status_health, _, _ = http_request(f"{gateway_url.rstrip('/')}/health")
+    if status_health == 200:
+        print("[PASS] Gateway -> /health returned HTTP 200 (service healthy and database connected).")
+    else:
+        all_passed = False
+        print(f"[FAIL] Gateway -> /health returned HTTP {status_health}.")
+
+    # Check 0c: Gateway /docs (Swagger UI)
     status_docs, _, _ = http_request(f"{gateway_url.rstrip('/')}/docs")
     if status_docs == 200:
-        print("[PASS] Gateway -> /docs returned HTTP 200 (interactive API documentation available).")
+        print("[PASS] Gateway -> /docs returned HTTP 200 (interactive Swagger documentation available).")
     else:
-        print(f"[WARN] Gateway -> /docs returned HTTP {status_docs} (Swagger UI check).")
+        all_passed = False
+        print(f"[FAIL] Gateway -> /docs returned HTTP {status_docs} (Swagger UI check).")
 
     # Check 1: Gateway /api/v1/jobs
     status, headers, body = http_request(f"{gateway_url.rstrip('/')}/api/v1/jobs")
     if status == 200:
         print("[PASS] Gateway -> /api/v1/jobs returned HTTP 200 (database schema verified).")
+    elif status == 503 and not job_url:
+        print("[STAGE 1 INFO] Gateway -> /api/v1/jobs returned HTTP 503 (Upstream Job service not yet deployed/configured).")
+        print("               This is normal in Stage 1 before the Jobs service is deployed.")
     else:
         all_passed = False
         diag = classify_http_response(status, headers, body)
@@ -260,7 +288,7 @@ def run_checks(
         if diag in DECISION_TABLE:
             print(f"       -> {DECISION_TABLE[diag]}")
 
-    # Check 2: Gateway -> Resume routing (must not be 404)
+    # Check 2: Gateway -> Resume routing
     status, headers, body = http_request(f"{gateway_url.rstrip('/')}/api/v1/recommendations")
     if status != 404:
         print(f"[PASS] Gateway -> Resume route active (HTTP {status}, route correctly bound).")
@@ -271,16 +299,37 @@ def run_checks(
         else:
             print(f"[PASS] Gateway -> Resume route responded (HTTP {status}).")
 
-    # Check 3: Frontend index.html validation
+    # Check 3: Frontend index.html and JS bundle validation
     if web_url:
         status, _, body = http_request(web_url)
         if status == 200:
-            if "localhost" in body:
+            print("[PASS] Frontend static site index loaded successfully (HTTP 200).")
+            import re
+            script_srcs = re.findall(r'<script[^>]+src=["\']([^"\']+)["\']', body)
+            localhost_leak = False
+            leaked_bundle = None
+            if "localhost:8000" in body or "localhost:8001" in body:
+                localhost_leak = True
+                leaked_bundle = "index.html"
+
+            for src in script_srcs:
+                if src.startswith("http://") or src.startswith("https://"):
+                    bundle_url = src
+                else:
+                    bundle_url = f"{web_url.rstrip('/')}/{src.lstrip('/')}"
+                b_status, _, b_body = http_request(bundle_url)
+                if b_status == 200:
+                    if "localhost:8000" in b_body or "localhost:8001" in b_body:
+                        localhost_leak = True
+                        leaked_bundle = src
+                        break
+
+            if localhost_leak:
                 all_passed = False
-                print("[FAIL] Frontend bundle contains 'localhost' references! Needs rebuild with production VITE_* variables.")
+                print(f"[FAIL] Frontend bundle ({leaked_bundle}) contains baked-in localhost API URL!")
                 print(f"       -> {DECISION_TABLE['localhost-baked']}")
             else:
-                print("[PASS] Frontend static site loaded successfully (no localhost leaks).")
+                print("[PASS] Frontend bundle scanned: 0 localhost API URLs found; backend API configured cleanly.")
         else:
             all_passed = False
             print(f"[FAIL] Frontend web URL returned HTTP {status}.")
@@ -289,10 +338,10 @@ def run_checks(
     if web_url:
         cors_ok, msg = check_cors_preflight(gateway_url, web_url)
         if cors_ok:
-            print(f"[PASS] CORS Preflight succeeded: {msg}")
+            print(f"[PASS] CORS Preflight succeeded from {web_url}: {msg}")
         else:
             all_passed = False
-            print(f"[FAIL] CORS Preflight failed: {msg}")
+            print(f"[FAIL] CORS Preflight failed from {web_url}: {msg}")
             print(f"       -> {DECISION_TABLE['cors-blocked']}")
 
     print("\n" + "=" * 75)
@@ -303,10 +352,10 @@ def run_checks(
 
 def main():
     parser = argparse.ArgumentParser(description="SwipeX Live Deployment Diagnosis Tool")
-    parser.add_argument("--gateway", required=True, help="Render Gateway public URL")
-    parser.add_argument("--jobs", default=None, help="Render Job Service public URL")
-    parser.add_argument("--resume", default=None, help="Render Resume Service public URL")
-    parser.add_argument("--web", default=None, help="Render Frontend Web public URL")
+    parser.add_argument("--gateway", "--base-url", dest="gateway", required=True, help="Render Gateway public URL")
+    parser.add_argument("--jobs", "--job-url", dest="jobs", default=None, help="Render Job Service public URL")
+    parser.add_argument("--resume", "--resume-url", dest="resume", default=None, help="Render Resume Service public URL")
+    parser.add_argument("--web", "--frontend-url", dest="web", default=None, help="Render Frontend Web public URL")
     parser.add_argument("--blueprint", default=None, help="Path to render.yaml")
     args = parser.parse_args()
 

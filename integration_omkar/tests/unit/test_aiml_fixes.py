@@ -8,10 +8,18 @@ AIML_DIR = os.path.join(BASE_DIR, "aiml_hemalatha")
 if AIML_DIR not in sys.path:
     sys.path.insert(0, AIML_DIR)
 
-# Dynamically point 'app' package to aiml_hemalatha/app to prevent collision with backend_mansi
-aiml_app = types.ModuleType("app")
-aiml_app.__path__ = [os.path.join(AIML_DIR, "app")]
-sys.modules["app"] = aiml_app
+# Dynamically add aiml_hemalatha/app to 'app' package __path__
+aiml_app_dir = os.path.join(AIML_DIR, "app")
+if "app" not in sys.modules:
+    aiml_app = types.ModuleType("app")
+    aiml_app.__path__ = [aiml_app_dir]
+    sys.modules["app"] = aiml_app
+else:
+    app_mod = sys.modules["app"]
+    if not hasattr(app_mod, "__path__") or not isinstance(app_mod.__path__, list):
+        app_mod.__path__ = []
+    if aiml_app_dir not in app_mod.__path__:
+        app_mod.__path__.append(aiml_app_dir)
 
 if "sentence_transformers" not in sys.modules:
     mock_st = MagicMock()

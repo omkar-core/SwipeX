@@ -5,11 +5,31 @@ import pytest
 from pathlib import Path
 from starlette.testclient import TestClient
 
-# Ensure sys.path includes backend_mansi
+# Ensure sys.path includes backend_mansi and namespace is isolated
 import sys
+import types
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-if str(REPO_ROOT / "backend_mansi") not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT / "backend_mansi"))
+backend_mansi_path = str(REPO_ROOT / "backend_mansi")
+aiml_path = str(REPO_ROOT / "aiml_hemalatha")
+if backend_mansi_path not in sys.path:
+    sys.path.insert(0, backend_mansi_path)
+if aiml_path not in sys.path:
+    sys.path.insert(1, aiml_path)
+
+mansi_app_dir = str(REPO_ROOT / "backend_mansi" / "app")
+aiml_app_dir = str(REPO_ROOT / "aiml_hemalatha" / "app")
+if "app" not in sys.modules:
+    app_pkg = types.ModuleType("app")
+    app_pkg.__path__ = [mansi_app_dir, aiml_app_dir]
+    sys.modules["app"] = app_pkg
+else:
+    app_mod = sys.modules["app"]
+    if not hasattr(app_mod, "__path__") or not isinstance(app_mod.__path__, list):
+        app_mod.__path__ = []
+    if mansi_app_dir not in app_mod.__path__:
+        app_mod.__path__.insert(0, mansi_app_dir)
+    if aiml_app_dir not in app_mod.__path__:
+        app_mod.__path__.append(aiml_app_dir)
 
 from app.main import app as gateway_app
 from integration_omkar.deploy.combined_app import CombinedASGIApp
@@ -32,6 +52,9 @@ def mock_dist(tmp_path):
 
     favicon = dist_dir / "favicon.ico"
     favicon.write_text("fake-icon-content", encoding="utf-8")
+
+    favicon_svg = dist_dir / "favicon.svg"
+    favicon_svg.write_text("<svg>favicon-content</svg>", encoding="utf-8")
 
     secret_file = tmp_path / "secret.txt"
     secret_file.write_text("TOP_SECRET_CONTENT", encoding="utf-8")
@@ -160,3 +183,45 @@ def test_gateway_app_routes_unmutated(mock_dist):
 
     routes_after = [r.path for r in gateway_app.routes]
     assert routes_before == routes_after
+
+
+def test_logo_svg_fallback(mock_dist):
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    res = client.get("/logo.svg")
+    assert res.status_code == 200
+    assert "svg" in res.headers.get("content-type", "")
+    assert "favicon-content" in res.text
+
+
+def test_auth_register_candidate_role_adaptation(mock_dist):
+    import uuid
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    random_email = f"candidate_{uuid.uuid4().hex[:8]}@example.com"
+    payload = {
+        "name": "Candidate User",
+        "email": random_email,
+        "password": "Password123!",
+        "role": "candidate"  # Frontend uses candidate; gateway uses job_seeker
+    }
+
+    # Must NOT fail with 422 Unprocessable Content
+    res = client.post("/api/v1/auth/register", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert "user_id" in data
+
+
+def test_google_oauth_fallback(mock_dist, monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "")
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    res = client.get("/api/v1/auth/oauth/google")
+    assert res.status_code == 200
+    data = res.json()
+    assert "access_token" in data
+    assert data.get("role") == "candidate"

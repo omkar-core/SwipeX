@@ -63,12 +63,19 @@ fi
 DIST_SIZE=$(wc -c < "frontend_boomika/dist/index.html" | tr -d ' ')
 echo "[BUILD] [OK] Frontend build succeeded. dist/index.html size: ${DIST_SIZE} bytes."
 
+# Ensure logo.svg exists in dist to prevent browser 404
+if [ -f "frontend_boomika/dist/favicon.svg" ] && [ ! -f "frontend_boomika/dist/logo.svg" ]; then
+    cp frontend_boomika/dist/favicon.svg frontend_boomika/dist/logo.svg || true
+    echo "[BUILD] Generated dist/logo.svg from favicon.svg."
+fi
+
 # 5. Install Python Production Requirements
 echo "[BUILD] Installing Python production requirements..."
 pip install --upgrade pip
 pip install --prefer-binary \
     -r backend_mansi/requirements.txt \
     -r data_hanith/requirements.txt \
+    -r aiml_hemalatha/requirements.txt \
     -r integration_omkar/requirements-prod.txt
 
 echo "=================================================================="

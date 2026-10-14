@@ -105,6 +105,10 @@ def setup_environment(app_str: str = ""):
     if "backend_mansi" in app_str or "combined_app" in app_str:
         paths_to_add.append(os.path.join(BASE_DIR, "backend_mansi"))
         paths_to_add.append(os.path.join(BASE_DIR, "data_hanith"))
+        if "combined_app" in app_str:
+            os.environ.setdefault("JOB_SERVICE_URL", "http://127.0.0.1:8002")
+            os.environ.setdefault("RESUME_SERVICE_URL", "http://127.0.0.1:8003")
+            os.environ.setdefault("MATCHING_ENGINE_URL", "http://127.0.0.1:8003")
     elif "aiml_hemalatha" in app_str:
         paths_to_add.append(os.path.join(BASE_DIR, "aiml_hemalatha"))
     elif "data_hanith" in app_str:

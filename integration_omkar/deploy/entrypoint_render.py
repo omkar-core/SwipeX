@@ -102,7 +102,7 @@ def setup_environment(app_str: str = ""):
     # Isolate active service path to avoid namespace collision on 'app'
     # between backend_mansi/app and aiml_hemalatha/app
     paths_to_add = [BASE_DIR, os.path.join(BASE_DIR, "integration_omkar")]
-    if "backend_mansi" in app_str:
+    if "backend_mansi" in app_str or "combined_app" in app_str:
         paths_to_add.append(os.path.join(BASE_DIR, "backend_mansi"))
         paths_to_add.append(os.path.join(BASE_DIR, "data_hanith"))
     elif "aiml_hemalatha" in app_str:

@@ -78,7 +78,7 @@ def test_redact_url_inside_exception_message():
     try:
         raise ConnectionError(
             "FATAL: password authentication failed for connection to "
-            "postgresql://swipex_adm:SENTINEL_EXC_PW_99@db.render.com:5432/swipex"
+            "postgresql://db_adm:SENTINEL_EXC_PW_99@db.render.com:5432/target_db"
         )
     except Exception as exc:
         exc_str = str(exc)
@@ -88,7 +88,7 @@ def test_redact_url_inside_exception_message():
         redacted_tb = redact_text(tb_str)
 
         assert "SENTINEL_EXC_PW_99" not in redacted_msg
-        assert "postgresql://swipex_adm:***@db.render.com:5432/swipex" in redacted_msg
+        assert "postgresql://db_adm:***@db.render.com:5432/target_db" in redacted_msg
         assert "SENTINEL_EXC_PW_99" not in redacted_tb
 
 

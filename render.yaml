@@ -45,15 +45,15 @@ services:
         value: "false"
 
   # ---------------------------------------------------------------------------
-  # 2. Auth Service & API Gateway (Web Service with WebSocket support)
+  # 2. Auth Service & API Gateway (Unified Web Service: React Client + Gateway)
   # ---------------------------------------------------------------------------
   - type: web
     name: swipex-omkar-gateway
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install --upgrade pip && pip install --prefer-binary -r backend_mansi/requirements.txt -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt
-    startCommand: python integration_omkar/deploy/entrypoint_render.py --app backend_mansi.app.main:app
+    buildCommand: bash integration_omkar/deploy/build_render.sh
+    startCommand: python integration_omkar/deploy/entrypoint_render.py --app integration_omkar.deploy.combined_app:app
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -72,6 +72,14 @@ services:
         generateValue: true
       - key: GATEWAY_SHARED_SECRET
         generateValue: true
+      - key: VITE_BASE_API_URL
+        value: /api/v1
+      - key: VITE_USE_MOCK
+        value: "false"
+      - key: VITE_API_URL
+        value: https://swipex-bpgb.onrender.com
+      - key: VITE_WS_URL
+        value: wss://swipex-bpgb.onrender.com/api/v1/notifications/ws
       - key: JOB_SERVICE_URL
         value: https://swipex-omkar-jobs.onrender.com
       - key: RESUME_SERVICE_URL

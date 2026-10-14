@@ -125,13 +125,13 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
 
 ---
 
-### Resource 4: Auth Service & API Gateway
-* **Name:** `swipex-omkar-gateway`
+### Resource 4: Auth Service & API Gateway (Unified Web Service: React Client + Gateway)
+* **Name:** `swipex-omkar-gateway` (e.g. `swipex-bpgb.onrender.com`)
 * **Region:** `oregon`
 * **Plan:** `Free`
 * **Runtime:** `Python`
-* **Build Command:** `pip install --upgrade pip && pip install --prefer-binary -r backend_mansi/requirements.txt -r data_hanith/requirements.txt -r integration_omkar/requirements-prod.txt`
-* **Start Command:** `python integration_omkar/deploy/entrypoint_render.py --app backend_mansi.app.main:app`
+* **Build Command:** `bash integration_omkar/deploy/build_render.sh`
+* **Start Command:** `python integration_omkar/deploy/entrypoint_render.py --app integration_omkar.deploy.combined_app:app`
 * **Health Check Path:** `/health`
 * **Environment Variables:**
   - `PYTHON_VERSION`: `3.11.9`
@@ -140,10 +140,14 @@ If the Blueprint Apply fails or is blocked, create the resources manually in thi
   - `JWT_SECRET_KEY`: *(Generate random 32-character string)*
   - `SESSION_SECRET_KEY`: *(Generate random 32-character string)*
   - `GATEWAY_SHARED_SECRET`: `swipex-secure-cluster-secret-2026`
+  - `VITE_BASE_API_URL`: `/api/v1`
+  - `VITE_USE_MOCK`: `false`
+  - `VITE_API_URL`: `https://swipex-bpgb.onrender.com`
+  - `VITE_WS_URL`: `wss://swipex-bpgb.onrender.com/api/v1/notifications/ws`
   - `JOB_SERVICE_URL`: `https://swipex-omkar-jobs.onrender.com`
   - `RESUME_SERVICE_URL`: `https://swipex-omkar-resume.onrender.com`
   - `MATCHING_ENGINE_URL`: `https://swipex-omkar-resume.onrender.com`
-  - `CORS_ORIGINS`: `https://swipex-omkar-web.onrender.com`
+  - `CORS_ORIGINS`: `*`
 
 ---
 

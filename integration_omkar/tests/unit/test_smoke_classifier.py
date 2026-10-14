@@ -152,3 +152,47 @@ def test_blueprint_preflight_validation():
     assert is_valid is True
     assert len(errors) == 0
     assert meta["migration_runners"] == ["svc1"]
+
+
+def test_postdeploy_check_api_only_mode(monkeypatch):
+    from integration_omkar.scripts.render_postdeploy_check import run_checks
+
+    def mock_http_request(url, method="GET", headers=None, timeout=15):
+        if url.endswith("/health"):
+            return 200, {"content-type": "application/json"}, '{"status": "ok"}'
+        if url.endswith("/docs"):
+            return 200, {"content-type": "text/html"}, "<html>Swagger UI</html>"
+        if url.endswith("/api/v1/jobs"):
+            return 200, {"content-type": "application/json"}, '{"jobs": []}'
+        if url.endswith("/api/v1/recommendations"):
+            return 200, {"content-type": "application/json"}, '{"items": []}'
+        if url.rstrip("/").endswith(".onrender.com"):
+            # Root path in API-only mode returns 404 JSON
+            return 404, {"content-type": "application/json"}, '{"detail": "Not Found"}'
+        return 404, {}, "Not Found"
+
+    monkeypatch.setattr("integration_omkar.scripts.render_postdeploy_check.http_request", mock_http_request)
+    success = run_checks(gateway_url="https://fake-gw.onrender.com", single_service=False)
+    assert success is True
+
+
+def test_postdeploy_check_single_service_mode(monkeypatch):
+    from integration_omkar.scripts.render_postdeploy_check import run_checks
+
+    def mock_http_request(url, method="GET", headers=None, timeout=15):
+        if url.endswith("/health"):
+            return 200, {"content-type": "application/json"}, '{"status": "ok"}'
+        if url.endswith("/docs"):
+            return 200, {"content-type": "text/html"}, "<html>Swagger UI</html>"
+        if url.endswith("/api/v1/jobs"):
+            return 200, {"content-type": "application/json"}, '{"jobs": []}'
+        if url.endswith("/api/v1/recommendations"):
+            return 200, {"content-type": "application/json"}, '{"items": []}'
+        if url.endswith("/login") or url.rstrip("/").endswith(".onrender.com"):
+            # Root and client route in single-service mode returns 200 HTML with React root
+            return 200, {"content-type": "text/html"}, '<html><body><div id="root">SwipeX</div></body></html>'
+        return 404, {}, "Not Found"
+
+    monkeypatch.setattr("integration_omkar.scripts.render_postdeploy_check.http_request", mock_http_request)
+    success = run_checks(gateway_url="https://fake-gw.onrender.com", single_service=True)
+    assert success is True

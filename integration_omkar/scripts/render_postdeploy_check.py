@@ -205,6 +205,7 @@ def run_checks(
     resume_url: Optional[str] = None,
     web_url: Optional[str] = None,
     blueprint_path: Optional[str] = None,
+    single_service: bool = False,
 ) -> bool:
     print("=" * 75)
     print("           SWIPEX LIVE RENDER POST-DEPLOYMENT VERIFICATION           ")
@@ -249,14 +250,47 @@ def run_checks(
     print("\n--- Phase 2: Functional Contract Checks ---")
     all_passed = True
 
-    # Check 0a: Gateway root / (expected 404 on API gateway, never a failure)
-    status_root, _, _ = http_request(f"{gateway_url.rstrip('/')}/")
-    if status_root == 404:
-        print("[PASS] Gateway -> GET / returned expected HTTP 404 (FastAPI backend API root; normal response).")
-    elif 200 <= status_root < 300:
-        print(f"[PASS] Gateway -> GET / returned HTTP {status_root}.")
+    # Check 0a: Gateway root / (Mode-aware check)
+    status_root, _, body_root = http_request(f"{gateway_url.rstrip('/')}/")
+    is_serving_web = (status_root == 200 and ("<html" in body_root.lower() or "root" in body_root))
+
+    if single_service or is_serving_web:
+        if status_root == 200 and ("<html" in body_root.lower() or "root" in body_root):
+            print("[PASS] Gateway -> GET / returned HTTP 200 (Single-service mode: React website active).")
+            # Scan HTML and linked bundles for localhost leaks
+            import re
+            script_srcs = re.findall(r'<script[^>]+src=["\']([^"\']+)["\']', body_root)
+            localhost_leak = False
+            for src in script_srcs:
+                bundle_url = src if src.startswith("http") else f"{gateway_url.rstrip('/')}/{src.lstrip('/')}"
+                b_status, _, b_body = http_request(bundle_url)
+                if b_status == 200 and ("localhost:8000" in b_body or "localhost:8001" in b_body):
+                    localhost_leak = True
+                    print(f"[FAIL] Gateway-served frontend bundle ({src}) contains baked-in localhost API URL!")
+                    break
+            if localhost_leak:
+                all_passed = False
+                print(f"       -> {DECISION_TABLE['localhost-baked']}")
+            else:
+                print("[PASS] Gateway-served frontend bundle verified: 0 localhost API URLs found.")
+        else:
+            all_passed = False
+            print(f"[FAIL] Gateway -> GET / returned HTTP {status_root} (Expected HTTP 200 in single-service mode).")
+
+        # Check client route SPA refresh in single-service mode
+        status_login, _, body_login = http_request(f"{gateway_url.rstrip('/')}/login")
+        if status_login == 200 and ("<html" in body_login.lower() or "root" in body_login):
+            print("[PASS] Gateway -> GET /login returned HTTP 200 (SPA client-side route refresh verified).")
+        else:
+            all_passed = False
+            print(f"[FAIL] Gateway -> GET /login returned HTTP {status_login} (SPA fallback failed).")
     else:
-        print(f"[INFO] Gateway -> GET / returned HTTP {status_root}.")
+        if status_root == 404:
+            print("[PASS] Gateway -> GET / returned expected HTTP 404 (API-only mode: normal backend response).")
+        elif 200 <= status_root < 300:
+            print(f"[PASS] Gateway -> GET / returned HTTP {status_root}.")
+        else:
+            print(f"[INFO] Gateway -> GET / returned HTTP {status_root}.")
 
     # Check 0b: Gateway /health
     status_health, _, _ = http_request(f"{gateway_url.rstrip('/')}/health")
@@ -356,6 +390,7 @@ def main():
     parser.add_argument("--jobs", "--job-url", dest="jobs", default=None, help="Render Job Service public URL")
     parser.add_argument("--resume", "--resume-url", dest="resume", default=None, help="Render Resume Service public URL")
     parser.add_argument("--web", "--frontend-url", dest="web", default=None, help="Render Frontend Web public URL")
+    parser.add_argument("--single-service", "--serves-frontend", dest="single_service", action="store_true", default=False, help="Verify single-service mode where Gateway serves frontend directly")
     parser.add_argument("--blueprint", default=None, help="Path to render.yaml")
     args = parser.parse_args()
 
@@ -365,6 +400,7 @@ def main():
         resume_url=args.resume,
         web_url=args.web,
         blueprint_path=args.blueprint,
+        single_service=args.single_service,
     )
     sys.exit(0 if success else 1)
 

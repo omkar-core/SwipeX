@@ -349,3 +349,18 @@ jobs:
             ${RENDER_RESUME_URL:+--resume-url "$RENDER_RESUME_URL"} \
             ${RENDER_FRONTEND_URL:+--frontend-url "$RENDER_FRONTEND_URL"} \
             --timeout 600
+
+      - name: Post-Deployment Diagnostic Health & Single-Service Check
+        env:
+          RENDER_BASE_URL: ${{ vars.RENDER_BASE_URL }}
+          RENDER_JOB_URL: ${{ vars.RENDER_JOB_URL }}
+          RENDER_RESUME_URL: ${{ vars.RENDER_RESUME_URL }}
+          RENDER_FRONTEND_URL: ${{ vars.RENDER_FRONTEND_URL }}
+          RENDER_SERVES_FRONTEND: ${{ vars.RENDER_SERVES_FRONTEND }}
+        run: |
+          python integration_omkar/scripts/render_postdeploy_check.py \
+            --gateway "$RENDER_BASE_URL" \
+            ${RENDER_JOB_URL:+--jobs "$RENDER_JOB_URL"} \
+            ${RENDER_RESUME_URL:+--resume "$RENDER_RESUME_URL"} \
+            ${RENDER_FRONTEND_URL:+--web "$RENDER_FRONTEND_URL"} \
+            ${RENDER_SERVES_FRONTEND:+--single-service}

@@ -45,15 +45,31 @@
 
 ---
 
-## Step 1: Auth Service & API Gateway (`swipex-omkar-gateway`)
+## Step 1: Unified Service — Auth Gateway + Frontend Web (`swipex-omkar-gateway`)
 - **Status:** **LIVE** at `https://swipex-bpgb.onrender.com`
-- **Missing Settings to Add in Render Dashboard:**
-  1. **Health Check Path:** `/health`
-  2. **Environment Variables to Add (once downstream services exist):**
-     - `JOB_SERVICE_URL`: Set to the live Jobs web service URL (e.g. `https://swipex-omkar-jobs.onrender.com`).
-     - `RESUME_SERVICE_URL`: Set to the live Resume web service URL (e.g. `https://swipex-omkar-resume.onrender.com`).
-     - `MATCHING_ENGINE_URL`: Set to the live Resume web service URL (e.g. `https://swipex-omkar-resume.onrender.com`).
-     - `CORS_ORIGINS`: Set to your frontend static site URL (e.g. `https://swipex-omkar-web.onrender.com`).
+- **Single-Service Mode (Default - One Link):**
+  Serves the React frontend website at `/` and handles all API traffic under `/api/v1/*`, `/docs`, and `/health`.
+  1. **Settings > Build Command:**
+     ```bash
+     bash integration_omkar/deploy/build_render.sh
+     ```
+  2. **Settings > Start Command:**
+     ```bash
+     python integration_omkar/deploy/entrypoint_render.py --app integration_omkar.deploy.combined_app:app
+     ```
+  3. **Settings > Health Check Path:** `/health`
+  4. **Environment Variables:**
+     - `VITE_BASE_API_URL`: `/api/v1`
+     - `VITE_USE_MOCK`: `false`
+     - `VITE_API_URL`: `https://swipex-bpgb.onrender.com`
+     - `VITE_WS_URL`: `wss://swipex-bpgb.onrender.com/api/v1/notifications/ws`
+     - `JOB_SERVICE_URL`: Set to live Jobs service URL once deployed in Step 2.
+     - `RESUME_SERVICE_URL`: Set to live Resume service URL once deployed in Step 3.
+     - `MATCHING_ENGINE_URL`: Set to live Resume service URL once deployed in Step 3.
+     - `CORS_ORIGINS`: Set to your frontend URL or `*`.
+
+- **Alternative (Split Mode):**
+  If you prefer a separate Static Site (`swipex-omkar-web`) on Render's global CDN instead of single-service mode, follow Step 4 below.
 
 ---
 

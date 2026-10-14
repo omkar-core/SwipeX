@@ -225,3 +225,103 @@ def test_google_oauth_fallback(mock_dist, monkeypatch):
     data = res.json()
     assert "access_token" in data
     assert data.get("role") == "candidate"
+
+
+def test_profile_endpoints(mock_dist):
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    # 1. GET /api/v1/profile/me
+    res_get = client.get("/api/v1/profile/me")
+    assert res_get.status_code == 200
+    data = res_get.json()
+    assert "user_id" in data
+    assert "skills" in data
+    assert data.get("role") == "candidate"
+    assert "email" in data
+
+    # 2. PUT /api/v1/profile/me
+    update_payload = {
+        "name": "Jane Developer",
+        "current_title": "Lead Frontend Architect",
+        "skills": ["React", "TypeScript", "Next.js", "GraphQL"],
+    }
+    res_put = client.put("/api/v1/profile/me", json=update_payload)
+    assert res_put.status_code == 200
+    data_put = res_put.json()
+    assert data_put.get("name") == "Jane Developer"
+    assert data_put.get("current_title") == "Lead Frontend Architect"
+    assert "GraphQL" in data_put.get("skills", [])
+
+    # 3. POST /api/v1/profile/upload-picture
+    res_pic = client.post("/api/v1/profile/upload-picture")
+    assert res_pic.status_code == 200
+    assert "profile_picture_url" in res_pic.json()
+
+
+def test_ats_score_and_suggestions(mock_dist):
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    # 1. POST /api/v1/ats/score
+    score_payload = {
+        "resume_id": "res_v3_frontend_2026",
+        "job_id": "job_nexus_01",
+    }
+    res_score = client.post("/api/v1/ats/score", json=score_payload)
+    assert res_score.status_code == 200
+    data_score = res_score.json()
+    assert data_score.get("match_score") >= 70
+    assert "matched_skills" in data_score
+    assert "missing_skills" in data_score
+    assert "missing_keywords" in data_score
+
+    # 2. GET /api/v1/ats/suggestions
+    res_sug = client.get("/api/v1/ats/suggestions?resume_id=res_v3_frontend_2026&job_id=job_nexus_01")
+    assert res_sug.status_code == 200
+    data_sug = res_sug.json()
+    assert "suggestions" in data_sug
+    assert len(data_sug["suggestions"]) > 0
+    assert "title" in data_sug["suggestions"][0]
+
+
+def test_notification_endpoints_and_seed_fallback(mock_dist):
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    # 1. PATCH /api/v1/notifications/notif_seed_1/read
+    res_read = client.patch("/api/v1/notifications/notif_seed_1/read")
+    assert res_read.status_code == 200
+    assert res_read.json().get("is_read") is True
+
+    # 2. GET /api/v1/notifications/preferences
+    res_pref = client.get("/api/v1/notifications/preferences")
+    assert res_pref.status_code == 200
+    data_pref = res_pref.json()
+    assert "user_id" in data_pref
+
+    # 3. GET /api/v1/notifications
+    res_list = client.get("/api/v1/notifications?limit=30")
+    assert res_list.status_code == 200
+    assert isinstance(res_list.json(), list)
+
+    # 4. GET /api/v1/notifications/unread-count
+    res_count = client.get("/api/v1/notifications/unread-count")
+    assert res_count.status_code == 200
+    assert "unread_count" in res_count.json()
+
+
+def test_resume_and_analytics_aliases(mock_dist):
+    app = CombinedASGIApp(gateway_app, dist_dir=mock_dist)
+    client = TestClient(app)
+
+    # 1. POST /api/v1/resumes/{id}/set-default
+    res_def = client.post("/api/v1/resumes/res_active_123/set-default")
+    assert res_def.status_code == 200
+    assert res_def.json().get("status") == "ok"
+
+    # 2. DELETE /api/v1/resumes/{id}
+    res_del = client.delete("/api/v1/resumes/res_active_123")
+    assert res_del.status_code == 200
+    assert res_del.json().get("deleted") is True
+

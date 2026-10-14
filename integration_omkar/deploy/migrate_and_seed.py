@@ -66,6 +66,50 @@ def wait_for_db(db_url: str, max_retries: int = 30, retry_delay: float = 1.0) ->
 SWIPEX_MIGRATION_LOCK_ID = 849204  # Unique 32-bit advisory lock key for SwipeX
 
 
+def sync_notification_and_m4_schemas(db_url: str):
+    """
+    Reconciles schema differences between data_hanith SQL tables and backend_mansi models:
+    1. notifications table: ensures columns 'type', 'channel', 'metadata_json' exist, and converts user_id/id to VARCHAR.
+    2. alert_preferences table: ensures columns 'email_enabled', 'push_enabled', 'in_app_enabled' exist, and converts user_id/id to VARCHAR.
+    3. Copies data between Hanith's notification_type/payload/channels and Mansi's columns.
+    """
+    if not db_url or "sqlite" in db_url:
+        return
+    try:
+        from data_hanith.db.connection import get_raw_connection
+        conn, db_type = get_raw_connection(db_url)
+        if db_type == "postgres":
+            if hasattr(conn, "autocommit"):
+                conn.autocommit = True
+            cur = conn.cursor()
+            statements = [
+                # Notifications schema reconciliation
+                "ALTER TABLE notifications ALTER COLUMN user_id TYPE VARCHAR(255);",
+                "ALTER TABLE notifications ALTER COLUMN id TYPE VARCHAR(255);",
+                "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'system';",
+                "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS channel VARCHAR(50) DEFAULT 'in_app';",
+                "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata_json TEXT;",
+                "UPDATE notifications SET type = LOWER(notification_type) WHERE type IS NULL OR type = 'system';",
+                # Alert preferences schema reconciliation
+                "ALTER TABLE alert_preferences ALTER COLUMN user_id TYPE VARCHAR(255);",
+                "ALTER TABLE alert_preferences ALTER COLUMN id TYPE VARCHAR(255);",
+                "ALTER TABLE alert_preferences ADD COLUMN IF NOT EXISTS email_enabled BOOLEAN DEFAULT TRUE;",
+                "ALTER TABLE alert_preferences ADD COLUMN IF NOT EXISTS push_enabled BOOLEAN DEFAULT TRUE;",
+                "ALTER TABLE alert_preferences ADD COLUMN IF NOT EXISTS in_app_enabled BOOLEAN DEFAULT TRUE;",
+                "UPDATE alert_preferences SET email_enabled = channel_email, push_enabled = channel_push, in_app_enabled = channel_in_app WHERE email_enabled IS NULL;",
+            ]
+            for stmt in statements:
+                try:
+                    cur.execute(stmt)
+                except Exception as stmt_err:
+                    logger.debug(f"Schema synchronization note ({stmt}): {stmt_err}")
+            cur.close()
+            conn.close()
+            logger.info("Notification and alert preference schema alignment completed.")
+    except Exception as exc:
+        logger.warning(f"Note: Schema alignment skipped or deferred: {exc}")
+
+
 def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
     # Determine Job Service DB URL
     # NOTE: No hardcoded hostname fallback — Render injects DATABASE_URL / JOB_DATABASE_URL
@@ -142,6 +186,14 @@ def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
             logger.info(f"Auth schema tables verified ({len(Base.metadata.tables)} models registered: {list(Base.metadata.tables.keys())}).")
         except Exception as e:
             logger.warning(f"Note: Auth DB initialization skipped or deferred: {e}")
+
+        # 5. Reconcile Notification and Alert Preference columns between data_hanith and backend_mansi
+        try:
+            sync_notification_and_m4_schemas(target_auth_url)
+            if target_job_url != target_auth_url:
+                sync_notification_and_m4_schemas(target_job_url)
+        except Exception as e:
+            logger.warning(f"Note: Schema synchronization skipped or deferred: {e}")
 
         logger.info("Database migration and baseline seeding complete! Exit Code 0.")
     finally:

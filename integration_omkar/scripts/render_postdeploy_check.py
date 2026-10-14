@@ -242,6 +242,13 @@ def run_checks(
     print("\n--- Phase 2: Functional Contract Checks ---")
     all_passed = True
 
+    # Check 0: Gateway /docs (Swagger UI)
+    status_docs, _, _ = http_request(f"{gateway_url.rstrip('/')}/docs")
+    if status_docs == 200:
+        print("[PASS] Gateway -> /docs returned HTTP 200 (interactive API documentation available).")
+    else:
+        print(f"[WARN] Gateway -> /docs returned HTTP {status_docs} (Swagger UI check).")
+
     # Check 1: Gateway /api/v1/jobs
     status, headers, body = http_request(f"{gateway_url.rstrip('/')}/api/v1/jobs")
     if status == 200:

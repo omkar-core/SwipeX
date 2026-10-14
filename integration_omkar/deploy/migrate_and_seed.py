@@ -23,6 +23,8 @@ sys.path.insert(0, os.path.join(BASE_DIR, "data_hanith"))
 sys.path.insert(0, os.path.join(BASE_DIR, "backend_mansi"))
 sys.path.insert(0, os.path.join(BASE_DIR, "integration_omkar"))
 
+from integration_omkar.deploy.redact import redact_url
+
 def normalize_db_url(url: str) -> str:
     """Normalize postgres:// to postgresql:// for SQLAlchemy / psycopg compatibility."""
     if url and url.startswith("postgres://"):
@@ -31,12 +33,21 @@ def normalize_db_url(url: str) -> str:
 
 def wait_for_db(db_url: str, max_retries: int = 30, retry_delay: float = 1.0) -> bool:
     """Waits for database connection to succeed."""
+    env_retries = os.environ.get("DB_MAX_RETRIES")
+    if env_retries and env_retries.isdigit():
+        max_retries = int(env_retries)
+    env_delay = os.environ.get("DB_RETRY_DELAY")
+    if env_delay:
+        try:
+            retry_delay = float(env_delay)
+        except ValueError:
+            pass
     normalized_url = normalize_db_url(db_url)
     if "sqlite" in normalized_url:
         return True
 
     from data_hanith.db.connection import get_raw_connection
-    logger.info(f"Waiting for database connection to {normalized_url}...")
+    logger.info(f"Waiting for database connection to {redact_url(normalized_url)}...")
     for attempt in range(1, max_retries + 1):
         try:
             conn, _ = get_raw_connection(normalized_url)
@@ -77,7 +88,7 @@ def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
         sys.exit(1)
     target_auth_url = normalize_db_url(raw_auth_url)
 
-    logger.info(f"[1/4] Connecting to Job Database: {target_job_url}")
+    logger.info(f"[1/4] Connecting to Job Database: {redact_url(target_job_url)}")
     if not wait_for_db(target_job_url):
         logger.error("Could not reach Job Database. Aborting migration.")
         sys.exit(1)
@@ -125,7 +136,7 @@ def run_migrations_and_seed(job_db_url: str = None, auth_db_url: str = None):
             sys.path.insert(0, mansi_path)
             from app.database import Base
             import app.models
-            logger.info(f"Ensuring Auth schema tables exist in {target_auth_url}...")
+            logger.info(f"Ensuring Auth schema tables exist in {redact_url(target_auth_url)}...")
             auth_engine = create_engine(target_auth_url)
             Base.metadata.create_all(bind=auth_engine)
             logger.info(f"Auth schema tables verified ({len(Base.metadata.tables)} models registered: {list(Base.metadata.tables.keys())}).")

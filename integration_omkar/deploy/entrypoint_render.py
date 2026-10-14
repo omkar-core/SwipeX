@@ -21,10 +21,22 @@ import socket
 import argparse
 import logging
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+omkar_path = os.path.join(BASE_DIR, "integration_omkar")
+if omkar_path not in sys.path:
+    sys.path.insert(0, omkar_path)
+
+from integration_omkar.deploy.redact import install_redaction_layer, redact_url
+
+# Install credential & password redaction layer BEFORE importing any owner code
+install_redaction_layer()
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("entrypoint_render")
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# Re-apply filter in case basicConfig re-initialized handlers
+install_redaction_layer()
 
 
 def _is_render_internal_host(host: str) -> bool:
@@ -115,6 +127,15 @@ def setup_environment(app_str: str = ""):
 
 def wait_for_db(max_wait_s: int = 60, retry_interval_s: float = 3.0) -> bool:
     """TCP-ping the DB host until it accepts connections or the deadline expires."""
+    env_wait = os.environ.get("DB_WAIT_TIMEOUT_SECONDS")
+    if env_wait and env_wait.isdigit():
+        max_wait_s = int(env_wait)
+    env_retry = os.environ.get("DB_RETRY_INTERVAL_SECONDS")
+    if env_retry:
+        try:
+            retry_interval_s = float(env_retry)
+        except ValueError:
+            pass
     db_url = os.environ.get("DATABASE_URL", "") or os.environ.get("JOB_DATABASE_URL", "")
     if not db_url or "sqlite" in db_url:
         return True

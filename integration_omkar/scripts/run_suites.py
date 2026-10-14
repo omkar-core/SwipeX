@@ -262,16 +262,56 @@ def run_suite_integration_unit() -> SuiteResult:
     cmd_secrets = [sys.executable, "-m", "pytest", "integration_omkar/tests/test_no_secrets_committed.py", "-v", "--tb=short"]
     res_secrets = run_cmd(cmd_secrets, cwd=BASE_DIR, env=env_secrets, suite_name="no-secrets-unit")
 
+    env_classifier = os.environ.copy()
+    env_classifier["PYTHONPATH"] = f"{BASE_DIR}"
+    cmd_classifier = [sys.executable, "-m", "pytest", "integration_omkar/tests/unit/test_smoke_classifier.py", "-v", "--tb=short"]
+    res_classifier = run_cmd(cmd_classifier, cwd=BASE_DIR, env=env_classifier, suite_name="smoke-classifier-unit")
+
+    env_redact = os.environ.copy()
+    env_redact["PYTHONPATH"] = f"{BASE_DIR}"
+    cmd_redact = [sys.executable, "-m", "pytest", "integration_omkar/tests/unit/test_redaction.py", "-v", "--tb=short"]
+    res_redact = run_cmd(cmd_redact, cwd=BASE_DIR, env=env_redact, suite_name="redaction-unit")
+
+    env_sentinel = os.environ.copy()
+    env_sentinel["PYTHONPATH"] = f"{BASE_DIR}"
+    cmd_sentinel = [sys.executable, "-m", "pytest", "integration_omkar/tests/test_sentinel_log_redaction.py", "-v", "--tb=short"]
+    res_sentinel = run_cmd(cmd_sentinel, cwd=BASE_DIR, env=env_sentinel, suite_name="sentinel-log-unit")
+
+    env_guide = os.environ.copy()
+    env_guide["PYTHONPATH"] = f"{BASE_DIR}"
+    cmd_guide = [sys.executable, "-m", "pytest", "integration_omkar/tests/unit/test_manual_render_guide.py", "-v", "--tb=short"]
+    res_guide = run_cmd(cmd_guide, cwd=BASE_DIR, env=env_guide, suite_name="manual-guide-unit")
+
     combined = SuiteResult("integration-unit")
-    combined.passed = res_aiml.passed + res_gateway.passed + res_parser.passed + res_secrets.passed
-    combined.failed = res_aiml.failed + res_gateway.failed + res_parser.failed + res_secrets.failed
-    combined.skipped = res_aiml.skipped + res_gateway.skipped + res_parser.skipped + res_secrets.skipped
-    combined.duration = res_aiml.duration + res_gateway.duration + res_parser.duration + res_secrets.duration
+    combined.passed = (
+        res_aiml.passed + res_gateway.passed + res_parser.passed +
+        res_secrets.passed + res_classifier.passed + res_redact.passed +
+        res_sentinel.passed + res_guide.passed
+    )
+    combined.failed = (
+        res_aiml.failed + res_gateway.failed + res_parser.failed +
+        res_secrets.failed + res_classifier.failed + res_redact.failed +
+        res_sentinel.failed + res_guide.failed
+    )
+    combined.skipped = (
+        res_aiml.skipped + res_gateway.skipped + res_parser.skipped +
+        res_secrets.skipped + res_classifier.skipped + res_redact.skipped +
+        res_sentinel.skipped + res_guide.skipped
+    )
+    combined.duration = (
+        res_aiml.duration + res_gateway.duration + res_parser.duration +
+        res_secrets.duration + res_classifier.duration + res_redact.duration +
+        res_sentinel.duration + res_guide.duration
+    )
     combined.exit_code = 0 if (
         res_aiml.exit_code == 0
         and res_gateway.exit_code == 0
         and res_parser.exit_code == 0
         and res_secrets.exit_code == 0
+        and res_classifier.exit_code == 0
+        and res_redact.exit_code == 0
+        and res_sentinel.exit_code == 0
+        and res_guide.exit_code == 0
         and combined.failed == 0
     ) else 1
     return combined

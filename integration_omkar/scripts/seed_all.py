@@ -17,6 +17,9 @@ sys.path.insert(0, SERVICE_DIR)
 from db.connection import get_raw_connection, init_db
 from config import DATABASE_URL
 
+sys.path.insert(0, os.path.join(BASE_DIR, "integration_omkar"))
+from integration_omkar.deploy.redact import redact_url
+
 CURATED_SEED_JOBS = [
     {
         "title": "Senior Full Stack Engineer",
@@ -132,7 +135,7 @@ CURATED_SEED_JOBS = [
 
 def seed_database(db_url: str = None):
     target_db_url = db_url or os.environ.get("DATABASE_URL", DATABASE_URL)
-    print(f"[SEED] Target database URL: {target_db_url}")
+    print(f"[SEED] Target database URL: {redact_url(target_db_url)}")
     
     schema_path = os.path.join(SERVICE_DIR, "db", "schema.sql")
     init_db(target_db_url, schema_path)

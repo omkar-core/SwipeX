@@ -22,6 +22,8 @@
 | **DEF-043** | High / Blocker | P0 | Render cloud build failure on unpinned Python 3.14 (pydantic-core wheel missing) | Platform & Deploy / Omkar (Intern 5) | Resolved via `render.yaml` `PYTHON_VERSION: 3.11.9`, `.python-version`, `--prefer-binary` |
 | **DEF-044** | Critical / Blocker | P0 | Render runtime exits 1: "No database URL configured" — RUN_MIGRATION enabled but DATABASE_URL never injected (manually-created service, env var not set; also render.yaml had RUN_MIGRATION=false on wrong commit) | Platform & Deploy / Omkar (Intern 5) | Resolved: render.yaml `fromDatabase` wiring confirmed; `RUN_MIGRATION` set to `"true"`; entrypoint hardened with clear error + 60s DB wait |
 | **DEF-045** | Medium | P2 | `data/raw/indian-job-market-dataset-2025.xlsx` not committed — ingest_dataset1.py would fail during seed on Render | Data & Seed / Hanith (Intern 3) | Entrypoint detects missing file and logs clear warning; app starts with curated seed data only. Patch prepared. |
+| **DEF-046** | Critical / Security | P0 | Plaintext database credentials leaked in migration logs (`apply_m4_migration.py:32`) | DB & Data / Hanith (Intern 3) | Mitigated at runtime via universal RedactionFilter & RedactingStream in entrypoint; patch provided (`data_hanith_redact_credentials.patch`) |
+| **DEF-047** | High / Security | P1 | Database connection string exposure risk in auth schema creation and exception traces | Auth & Gateway / Mansi (Intern 2) | Mitigated at runtime via entrypoint redaction layer; patch provided (`backend_mansi_redact_credentials.patch`) |
 
 
 ---
@@ -163,4 +165,28 @@
   1. `entrypoint_render.py` (Omkar's file): `maybe_run_migration()` now catches `FileNotFoundError` and logs `"Seed skipped: dataset file missing"` instead of crashing. The curated `seed_all.py` seed (5 jobs) runs regardless, so the app starts functional.
   2. **Owner action required (Hanith):** Either commit a representative subset of the dataset, or provide a download script that fetches it at build time. A defect patch will be prepared at `integration_omkar/patches/data_hanith_missing_dataset.patch`.
 - **Impact:** App starts and serves `/health` 200 and `/api/v1/jobs` with curated seed data. Recommendations and analytics based on the full dataset are not available until the dataset is provided.
+
+### DEF-046: Plaintext Database Password Leaked in Migration Logs
+- **Severity:** Critical (P0) / Security
+- **Component:** `data_hanith/scripts/apply_m4_migration.py:32`
+- **Owner:** Hanith (Intern 3)
+- **Observed Behavior:** On live Render startup (commit `69d1935`), migration log printed the full PostgreSQL connection string including password:
+  `Applying Milestone 4 migration script to: postgresql://swipex_user:***@host:5432/swipex_auth`
+- **Root Cause:** `apply_m4_migration.py:32` logged `target_url` directly via `logger.info(f"Applying Milestone 4 migration script to: {target_url}")` without masking authority credentials.
+- **Resolution:**
+  1. Intern 5 added `integration_omkar/deploy/redact.py` with `redact_url()`, `RedactionFilter`, and `RedactingStream` stream wrapper.
+  2. `entrypoint_render.py` installs this redaction layer BEFORE importing owner modules, regex-redacting `scheme://user:pass@host` and literal passwords from `os.environ` across all log handlers, `sys.stdout`, and `sys.stderr`.
+  3. All Intern 5 deployment scripts (`migrate_and_seed.py`, `seed_all.py`) updated to use `redact_url()`.
+  4. Prepared non-invasive patch for Hanith: `integration_omkar/patches/data_hanith_redact_credentials.patch`.
+
+### DEF-047: Database Connection String Exposure Risk in Auth Schema Creation
+- **Severity:** High (P1) / Security
+- **Component:** `backend_mansi/app/main.py:77`
+- **Owner:** Mansi (Intern 2)
+- **Observed Behavior:** Potential credential exposure in unhandled exceptions or error tracebacks if database table creation encounters connection errors.
+- **Root Cause:** Direct invocation of `Base.metadata.create_all(bind=engine)` without credential masking on thrown exceptions.
+- **Resolution:**
+  1. Universal entrypoint stream wrapper redacts exception messages and tracebacks containing database URLs or literal passwords.
+  2. Prepared patch for Mansi: `integration_omkar/patches/backend_mansi_redact_credentials.patch`.
+
 
